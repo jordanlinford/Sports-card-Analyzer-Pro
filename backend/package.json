@@ -1,0 +1,9 @@
+{
+  "name": "sports-card-backend",
+  "version": "1.0.0",
+  "description": "Backend service for sports card collection manager",
+  "scripts": {
+    "build": "pip install -r requirements.txt",
+    "start": "uvicorn scraper_api:app --host 0.0.0.0 --port 8000"
+  }
+} 
