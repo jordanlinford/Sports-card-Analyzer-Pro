@@ -20,24 +20,46 @@ const CollectionGrid: React.FC<CollectionGridProps> = ({ cards, onEditCard }) =>
       {cards.map((card) => (
         <div
           key={card.id}
-          className="relative group rounded-xl overflow-hidden shadow bg-white cursor-pointer"
+          className="relative group cursor-pointer"
           onClick={() => onEditCard(card)}
         >
-          <div className="aspect-[3/4] bg-gray-100 flex items-center justify-center">
-            <img
-              src={card.imageUrl || '/placeholder-card.png'}
-              alt={card.playerName}
-              className="w-full h-auto rounded-lg border object-contain"
-            />
-          </div>
-          <div className="absolute bottom-0 left-0 right-0 p-4 bg-black bg-opacity-75 text-white opacity-0 group-hover:opacity-100 transition-opacity">
-            <p className="text-sm font-semibold">{card.playerName} - {card.year}</p>
-            <p className="text-xs">Set: {card.cardSet}</p>
-            <p className="text-xs">Variation: {card.variation}</p>
-            <p className="text-xs">Condition: {card.condition}</p>
-            <p className="text-xs">Paid: ${card.pricePaid}</p>
-            <p className="text-xs">Value: ${card.currentValue}</p>
-          </div>
+          {card.imageUrl ? (
+            <>
+              <img
+                src={card.imageUrl}
+                alt={`${card.playerName} ${card.year} ${card.cardSet}`}
+                className="rounded-xl w-full shadow-md aspect-[2/3] object-cover"
+              />
+              <div className="absolute inset-0 bg-black bg-opacity-70 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center text-white text-sm rounded-xl p-2">
+                <div className="text-center p-3">
+                  <div className="font-semibold mb-1">{card.playerName}</div>
+                  <div className="text-xs mb-1">{card.year} {card.cardSet}</div>
+                  {card.variation && (
+                    <div className="text-xs mb-1">Variation: {card.variation}</div>
+                  )}
+                  {card.condition && (
+                    <div className="text-xs mb-1">Condition: {card.condition}</div>
+                  )}
+                  <div className="text-xs mt-2 flex justify-between">
+                    <span>Paid: ${card.pricePaid || 0}</span>
+                    <span>Value: ${card.currentValue || 0}</span>
+                  </div>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="rounded-xl w-full shadow-md aspect-[2/3] bg-gray-100 flex items-center justify-center">
+              <div className="text-center p-4">
+                <div className="font-semibold">{card.playerName}</div>
+                <div className="text-xs text-gray-600">
+                  {card.year} {card.cardSet}
+                </div>
+                {card.variation && (
+                  <div className="text-xs text-gray-600">Var: {card.variation}</div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       ))}
     </div>
