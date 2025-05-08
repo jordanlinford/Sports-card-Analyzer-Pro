@@ -79,17 +79,34 @@ export function useCards() {
   });
 
   const deleteCardMutation = useMutation({
-    mutationFn: (cardId: string) => {
-      if (!user?.uid) throw new Error("No user ID available");
-      return deleteCard(cardId, user.uid);
+    mutationFn: async (cardId: string) => {
+      console.log("useCards: Starting deleteCard mutation for card", cardId);
+      if (!user?.uid) {
+        console.error("useCards: No user ID available for deleteCard");
+        throw new Error("You must be logged in to delete cards");
+      }
+      try {
+        await deleteCard(cardId, user.uid);
+        console.log("useCards: Successfully deleted card", cardId);
+        return cardId;
+      } catch (error) {
+        console.error("useCards: Error in deleteCard mutation:", error);
+        throw error;
+      }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["cards"] });
+      // Properly invalidate all queries that might be affected
+      queryClient.invalidateQueries({ queryKey: ["cards", user?.uid] });
+      queryClient.invalidateQueries({ queryKey: ["displayCases", user?.uid] });
+      queryClient.invalidateQueries({ queryKey: ["publicDisplayCases"] });
       toast.success("Card deleted successfully");
     },
-    onError: (error: Error) => {
+    onError: (error: any) => {
       console.error("useCards: Error deleting card:", error);
-      toast.error("Failed to delete card");
+      
+      // Provide a more user-friendly error message
+      const errorMessage = error?.message || "Failed to delete card";
+      toast.error(errorMessage);
     },
   });
 

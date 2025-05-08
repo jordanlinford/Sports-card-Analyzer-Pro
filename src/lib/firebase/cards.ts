@@ -1,4 +1,4 @@
-import { collection, addDoc, getDocs, deleteDoc, doc, query, where, serverTimestamp, getDoc, updateDoc } from "firebase/firestore";
+import { collection, addDoc, getDocs, deleteDoc, doc, query, where, serverTimestamp, getDoc, updateDoc, setDoc } from "firebase/firestore";
 import { db } from "./config";
 import { Card } from "@/types/Card";
 
@@ -112,6 +112,22 @@ export async function addCard(cardData: Partial<Card>): Promise<string> {
     });
     
     console.log("addCard: Card added successfully with ID", docRef.id);
+    
+    // Also add to global cards collection for easier querying
+    try {
+      const globalCardRef = doc(db, "cards", docRef.id);
+      await setDoc(globalCardRef, {
+        ...cardData,
+        id: docRef.id,
+        ownerId: cardData.ownerId, // Ensure ownerId is explicitly set
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      console.log("addCard: Card added to global collection with ID", docRef.id);
+    } catch (globalError) {
+      console.error("addCard: Error adding card to global collection:", globalError);
+      // Don't fail if global addition fails
+    }
     
     // Now sync this card with display cases based on tags
     try {
@@ -248,35 +264,121 @@ export async function deleteCard(cardId: string, userId: string): Promise<void> 
   try {
     console.log("deleteCard: Deleting card", cardId, "for user", userId);
     
-    // Check both potential paths and delete where found
-    const cardPaths = [
-      doc(db, "users", userId, "cards", cardId),
-      doc(db, "users", userId, "collection", cardId)
-    ];
+    let cardData: any = null;
+    let wasDeleted = false;
     
-    // Try to delete from first path
+    // First, try to get the card data (we need it for removing from display cases)
     try {
-      const docSnapshot = await getDoc(cardPaths[0]);
-      if (docSnapshot.exists()) {
-        await deleteDoc(cardPaths[0]);
-        console.log("deleteCard: Card deleted from cards path");
+      // Check the collection path first (our primary location)
+      const collectionDocRef = doc(db, "users", userId, "collection", cardId);
+      const collectionSnapshot = await getDoc(collectionDocRef);
+      
+      if (collectionSnapshot.exists()) {
+        cardData = collectionSnapshot.data();
+        console.log("deleteCard: Found card in collection path:", cardData.playerName);
+        
+        // Delete from collection path
+        await deleteDoc(collectionDocRef);
+        console.log("deleteCard: Deleted card from collection path");
+        wasDeleted = true;
       }
     } catch (error) {
-      console.log("deleteCard: Card not found in cards path or deletion failed", error);
+      console.error("deleteCard: Error with collection path:", error);
     }
     
-    // Try to delete from second path
-    try {
-      const docSnapshot = await getDoc(cardPaths[1]);
-      if (docSnapshot.exists()) {
-        await deleteDoc(cardPaths[1]);
-        console.log("deleteCard: Card deleted from collection path");
+    // Try the cards path if not found or not deleted from collection
+    if (!wasDeleted) {
+      try {
+        const cardsDocRef = doc(db, "users", userId, "cards", cardId);
+        const cardsSnapshot = await getDoc(cardsDocRef);
+        
+        if (cardsSnapshot.exists()) {
+          if (!cardData) {
+            cardData = cardsSnapshot.data();
+            console.log("deleteCard: Found card in cards path:", cardData.playerName);
+          }
+          
+          // Delete from cards path
+          await deleteDoc(cardsDocRef);
+          console.log("deleteCard: Deleted card from cards path");
+          wasDeleted = true;
+        }
+      } catch (error) {
+        console.error("deleteCard: Error with cards path:", error);
       }
-    } catch (error) {
-      console.log("deleteCard: Card not found in collection path or deletion failed", error);
     }
     
-    console.log("deleteCard: Card delete operation completed");
+    if (!wasDeleted) {
+      throw new Error(`Card not found or could not be deleted: ${cardId}`);
+    }
+    
+    // Now remove this card from all display cases it might be in
+    try {
+      console.log("deleteCard: Checking display cases for card references");
+      
+      // Get all user's display cases
+      const displayCaseRef = collection(db, "users", userId, "display_cases");
+      const displayCasesSnapshot = await getDocs(displayCaseRef);
+      
+      let displayCasesUpdated = 0;
+      
+      // Check each display case
+      for (const dcDoc of displayCasesSnapshot.docs) {
+        const displayCase = dcDoc.data();
+        
+        // Skip if display case has no cardIds
+        if (!displayCase.cardIds || !Array.isArray(displayCase.cardIds)) {
+          continue;
+        }
+        
+        // Check if this display case contains the deleted card
+        if (displayCase.cardIds.includes(cardId)) {
+          console.log(`deleteCard: Removing card from display case: ${dcDoc.id}`);
+          
+          // Remove the card ID
+          const updatedCardIds = displayCase.cardIds.filter(id => id !== cardId);
+          
+          // Update the display case
+          const dcRef = doc(db, "users", userId, "display_cases", dcDoc.id);
+          await updateDoc(dcRef, {
+            cardIds: updatedCardIds,
+            updatedAt: new Date()
+          });
+          
+          displayCasesUpdated++;
+          
+          // Also update public version if it exists and is public
+          if (displayCase.isPublic) {
+            try {
+              const publicRef = doc(db, "public_display_cases", dcDoc.id);
+              const publicSnap = await getDoc(publicRef);
+              
+              if (publicSnap.exists()) {
+                await updateDoc(publicRef, {
+                  cardIds: updatedCardIds,
+                  updatedAt: new Date()
+                });
+                console.log(`deleteCard: Updated public display case ${dcDoc.id}`);
+              }
+            } catch (error) {
+              console.error(`deleteCard: Error updating public display case ${dcDoc.id}:`, error);
+            }
+          }
+        }
+      }
+      
+      if (displayCasesUpdated > 0) {
+        console.log(`deleteCard: Removed card from ${displayCasesUpdated} display cases`);
+      } else {
+        console.log("deleteCard: Card was not in any display cases");
+      }
+      
+    } catch (error) {
+      console.error("deleteCard: Error removing card from display cases:", error);
+      // Don't fail the delete operation if display case cleanup fails
+    }
+    
+    console.log("deleteCard: Card delete operation completed successfully");
   } catch (error) {
     console.error("deleteCard: Error deleting card:", error);
     throw error;

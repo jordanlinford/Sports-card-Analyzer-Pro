@@ -1,0 +1,87 @@
+import { createContext, useContext, useEffect, useState } from "react";
+import { User, getAuth, onAuthStateChanged, signOut, signInWithPopup, GoogleAuthProvider } from "firebase/auth";
+import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
+import { db } from "@/lib/firebase/config";
+import { toast } from "sonner";
+import { useNavigate } from "react-router-dom";
+
+interface AuthContextType {
+  user: User | null;
+  loading: boolean;
+  logout: () => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
+}
+
+const AuthContext = createContext<AuthContextType>({
+  user: null,
+  loading: true,
+  logout: async () => {},
+  signInWithGoogle: async () => {},
+});
+
+// Helper function to create user document if it doesn't exist
+const createUserIfNotExists = async (user: User) => {
+  const userRef = doc(db, "users", user.uid);
+  const userSnap = await getDoc(userRef);
+  
+  if (!userSnap.exists()) {
+    await setDoc(userRef, {
+      email: user.email,
+      displayName: user.displayName || "",
+      createdAt: new Date(),
+    });
+    console.log("✅ Firestore user created:", user.uid);
+  }
+};
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+  const auth = getAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        await createUserIfNotExists(user);
+        setUser(user);
+        toast.success(`Welcome back, ${user.displayName}!`);
+      } else {
+        setUser(null);
+      }
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [auth, navigate]);
+
+  const logout = async () => {
+    try {
+      await signOut(auth);
+      toast.success("Successfully signed out");
+      navigate("/login");
+    } catch (error) {
+      console.error("Error signing out:", error);
+      toast.error("Failed to sign out");
+    }
+  };
+
+  const signInWithGoogle = async () => {
+    try {
+      const provider = new GoogleAuthProvider();
+      await signInWithPopup(auth, provider);
+      toast.success("Successfully signed in!");
+    } catch (error) {
+      console.error("Error signing in with Google:", error);
+      toast.error("Failed to sign in. Please try again.");
+    }
+  };
+
+  return (
+    <AuthContext.Provider value={{ user, loading, logout, signInWithGoogle }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export const useAuth = () => useContext(AuthContext); 

@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Card } from '../services/CardService';
-import { cardService } from '../services/CardService';
+import { Card, CardService } from '../services/CardService';
 import { uploadImage } from '../utils/imageUpload';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '@/context/AuthContext';
+import { EmergencyDeleteButton } from './EmergencyDeleteButton';
 
 interface EditCardModalProps {
   card: Card;
@@ -13,57 +13,51 @@ interface EditCardModalProps {
 }
 
 export const EditCardModal = ({ card, isOpen, onClose, onCardUpdated, onCardDeleted }: EditCardModalProps) => {
-  const { currentUser } = useAuth();
+  const { user } = useAuth();
   const [editedCard, setEditedCard] = useState<Card>(card);
-  const [isUploading, setIsUploading] = useState(false);
-  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !currentUser) return;
+    if (!file || !user) return;
 
     try {
-      setIsUploading(true);
-      const imageUrl = await uploadImage(file, currentUser.uid);
+      const imageUrl = await uploadImage(file, user.uid);
       setEditedCard(prev => ({ ...prev, imageUrl }));
-    } catch (err) {
+    } catch (error) {
       setError('Failed to upload image');
-    } finally {
-      setIsUploading(false);
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!currentUser) {
-      setError('You must be logged in to update a card');
+    if (!user) {
+      setError('You must be logged in to edit cards');
       return;
     }
 
+    setIsLoading(true);
+    setError(null);
+
     try {
-      await cardService.updateCard(editedCard.id, {
-        ...editedCard,
-        ownerId: currentUser.uid
-      });
+      const updateData = {
+        playerName: editedCard.playerName,
+        year: editedCard.year,
+        cardSet: editedCard.cardSet,
+        variation: editedCard.variation,
+        cardNumber: editedCard.cardNumber,
+        condition: editedCard.condition,
+        imageUrl: editedCard.imageUrl,
+      };
+
+      await CardService.updateCard(user.uid, editedCard.id, updateData);
       onCardUpdated();
       onClose();
-    } catch (err) {
+    } catch (error) {
       setError('Failed to update card');
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!currentUser) {
-      setError('You must be logged in to delete a card');
-      return;
-    }
-
-    try {
-      await cardService.deleteCard(editedCard.id);
-      onCardDeleted();
-      onClose();
-    } catch (err) {
-      setError('Failed to delete card');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -71,7 +65,7 @@ export const EditCardModal = ({ card, isOpen, onClose, onCardUpdated, onCardDele
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-      <div className="bg-white p-6 rounded-lg w-full max-w-md">
+      <div className="bg-white p-6 rounded-lg w-full max-w-md max-h-[90vh] overflow-y-auto">
         <h2 className="text-2xl font-bold mb-4">Edit Card</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -87,16 +81,13 @@ export const EditCardModal = ({ card, isOpen, onClose, onCardUpdated, onCardDele
           </div>
 
           <div>
-            <label htmlFor="cardYear" className="block text-sm font-medium text-gray-700">Year</label>
+            <label htmlFor="year" className="block text-sm font-medium text-gray-700">Year</label>
             <input
-              id="cardYear"
-              type="number"
-              value={editedCard.cardYear}
-              onChange={(e) => setEditedCard(prev => ({ ...prev, cardYear: parseInt(e.target.value) }))}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-              required
-              min="1900"
-              max={new Date().getFullYear()}
+              id="year"
+              type="text"
+              value={editedCard.year}
+              onChange={(e) => setEditedCard({ ...editedCard, year: e.target.value })}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
             />
           </div>
 
@@ -185,9 +176,12 @@ export const EditCardModal = ({ card, isOpen, onClose, onCardUpdated, onCardDele
             <input
               id="tags"
               type="text"
-              value={editedCard.tags.join(', ')}
-              onChange={(e) => setEditedCard(prev => ({ ...prev, tags: e.target.value.split(',').map(tag => tag.trim()) }))}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+              value={editedCard.tags?.join(', ') || ''}
+              onChange={(e) => setEditedCard({ 
+                ...editedCard, 
+                tags: e.target.value.split(',').map(tag => tag.trim()).filter(Boolean)
+              })}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
             />
           </div>
 
@@ -197,10 +191,10 @@ export const EditCardModal = ({ card, isOpen, onClose, onCardUpdated, onCardDele
               id="image"
               type="file"
               accept="image/*"
-              onChange={handleImageUpload}
+              onChange={handleImageChange}
               className="mt-1 block w-full"
             />
-            {isUploading && <p className="text-sm text-gray-500">Uploading...</p>}
+            {isLoading && <p className="text-sm text-gray-500">Uploading...</p>}
             {editedCard.imageUrl && (
               <img
                 src={editedCard.imageUrl}
@@ -213,13 +207,13 @@ export const EditCardModal = ({ card, isOpen, onClose, onCardUpdated, onCardDele
           {error && <p className="text-red-500 text-sm">{error}</p>}
 
           <div className="flex justify-between">
-            <button
-              type="button"
-              onClick={handleDelete}
-              className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700"
-            >
-              Delete Card
-            </button>
+            <EmergencyDeleteButton 
+              cardId={editedCard.id}
+              onDeleted={() => {
+                onCardDeleted();
+                onClose();
+              }}
+            />
             <div className="space-x-2">
               <button
                 type="button"
@@ -231,7 +225,7 @@ export const EditCardModal = ({ card, isOpen, onClose, onCardUpdated, onCardDele
               <button
                 type="submit"
                 className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700"
-                disabled={isUploading}
+                disabled={isLoading}
               >
                 Save Changes
               </button>
