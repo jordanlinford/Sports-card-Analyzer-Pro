@@ -1,12 +1,25 @@
 import React from 'react';
 import { Card } from '@/types/Card';
+import { EmergencyDeleteButton } from '@/components/EmergencyDeleteButton';
+import { useQueryClient } from '@tanstack/react-query';
+import { Button } from '@/components/ui/button';
+import { RefreshCw } from 'lucide-react';
 
 interface CollectionGridProps {
   cards: Card[];
   onEditCard: (card: Card) => void;
+  onUpdateCard?: (card: Card) => Promise<void>;
+  updatingCardIds?: string[];
 }
 
-const CollectionGrid: React.FC<CollectionGridProps> = ({ cards, onEditCard }) => {
+const CollectionGrid: React.FC<CollectionGridProps> = ({ 
+  cards, 
+  onEditCard, 
+  onUpdateCard,
+  updatingCardIds = []
+}) => {
+  const queryClient = useQueryClient();
+
   if (!cards || cards.length === 0) {
     return (
       <div className="text-center text-gray-500 py-4">
@@ -14,6 +27,11 @@ const CollectionGrid: React.FC<CollectionGridProps> = ({ cards, onEditCard }) =>
       </div>
     );
   }
+
+  const handleCardDeleted = () => {
+    // Refetch cards after deletion
+    queryClient.invalidateQueries({ queryKey: ["cards"] });
+  };
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -23,6 +41,35 @@ const CollectionGrid: React.FC<CollectionGridProps> = ({ cards, onEditCard }) =>
           className="relative group cursor-pointer"
           onClick={() => onEditCard(card)}
         >
+          {/* Action buttons */}
+          <div className="absolute top-2 right-2 z-10 flex space-x-1">
+            <div onClick={(e) => e.stopPropagation()}>
+              <EmergencyDeleteButton
+                cardId={card.id}
+                onDeleted={handleCardDeleted}
+              />
+            </div>
+            
+            {/* Update button */}
+            {onUpdateCard && (
+              <div onClick={(e) => e.stopPropagation()}>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8 bg-white"
+                  onClick={() => onUpdateCard(card)}
+                  disabled={updatingCardIds.includes(card.id)}
+                >
+                  {updatingCardIds.includes(card.id) ? (
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-solid border-current border-r-transparent" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+            )}
+          </div>
+
           {card.imageUrl ? (
             <>
               <img

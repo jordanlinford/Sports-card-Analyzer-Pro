@@ -3,6 +3,7 @@ import { emergencyDeleteCard } from "@/lib/firebase/emergencyDeleteCard";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { Trash2 } from "lucide-react";
 
 interface Props {
   cardId: string;
@@ -64,11 +65,12 @@ export function EmergencyDeleteButton({ cardId, onDeleted }: Props) {
     <div className="relative">
       <Button 
         variant="destructive" 
-        size="sm" 
+        size="icon"
         onClick={handleDelete} 
         disabled={isDeleting}
+        className="h-8 w-8"
       >
-        {isDeleting ? "Deleting..." : "Delete Card"}
+        {isDeleting ? "..." : <Trash2 size={16} />}
       </Button>
       
       {message && (
