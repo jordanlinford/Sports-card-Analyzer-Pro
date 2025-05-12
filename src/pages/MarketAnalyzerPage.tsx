@@ -26,6 +26,7 @@ import { useNavigate } from 'react-router-dom';
 import { useCards } from '@/hooks/useCards';
 import { toast } from 'sonner';
 import { useAuth } from '@/context/AuthContext'; // Add auth context
+import { useUserSubscription } from "@/hooks/useUserSubscription";
 
 // Import eBay scraper utilities
 import { 
@@ -281,6 +282,7 @@ interface CardVariation {
 
 export default function MarketAnalyzerPage() {
   const { user } = useAuth();
+  const { isAdmin } = useUserSubscription();
   const { addCard } = useCards();
   const navigate = useNavigate();
   

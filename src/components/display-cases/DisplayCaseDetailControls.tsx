@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { doc, deleteDoc } from "firebase/firestore";
+import { doc, deleteDoc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase/config";
 import { DisplayCase } from "@/types/display-case";
 import { Button } from "@/components/ui/button";
 import { EditDisplayCaseModal } from "./EditDisplayCaseModal";
 import { toast } from "sonner";
+import { Link2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -40,9 +41,24 @@ export function DisplayCaseDetailControls({
     setIsDeleting(true);
     
     try {
-      // Delete the display case document
+      // Delete the display case document from user's collection
       const displayCaseRef = doc(db, "users", userId, "display_cases", displayCase.id);
       await deleteDoc(displayCaseRef);
+      
+      // If the display case was public, also delete it from public collection
+      if (displayCase.isPublic) {
+        console.log("Deleting from public collection");
+        const publicRef = doc(db, "public_display_cases", displayCase.id);
+        try {
+          const publicSnap = await getDoc(publicRef);
+          if (publicSnap.exists()) {
+            await deleteDoc(publicRef);
+          }
+        } catch (err) {
+          console.error("Error deleting from public collection:", err);
+          // Continue anyway since the main delete succeeded
+        }
+      }
       
       toast.success("Display case deleted successfully");
       // Redirect to display cases list
@@ -54,6 +70,22 @@ export function DisplayCaseDetailControls({
     }
   };
 
+  const copyPublicLink = () => {
+    // Use the display case ID directly as the publicId
+    const publicId = displayCase.id;
+    const publicUrl = `${window.location.origin}/display/${publicId}`;
+    
+    navigator.clipboard.writeText(publicUrl)
+      .then(() => {
+        toast.success("Public link copied to clipboard!");
+        console.log("Public URL:", publicUrl);
+      })
+      .catch((error) => {
+        console.error("Error copying to clipboard:", error);
+        toast.error("Failed to copy link");
+      });
+  };
+
   return (
     <div className="flex gap-2">
       <Button 
@@ -63,6 +95,18 @@ export function DisplayCaseDetailControls({
       >
         Edit
       </Button>
+      
+      {displayCase.isPublic && (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={copyPublicLink}
+          className="flex items-center gap-1"
+        >
+          <Link2 className="h-4 w-4" />
+          <span>Get Public Link</span>
+        </Button>
+      )}
       
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogTrigger asChild>

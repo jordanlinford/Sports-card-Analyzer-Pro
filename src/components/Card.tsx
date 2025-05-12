@@ -1,62 +1,53 @@
-import { useState } from 'react';
-import { Card as CardType } from '../services/CardService';
-import { EditCardModal } from './EditCardModal';
+import { Card as CardType } from "@/types/Card";
+import { useAuth } from "@/context/AuthContext";
+import { EmergencyDeleteButton } from "@/components/EmergencyDeleteButton";
 
 interface CardProps {
   card: CardType;
-  onCardUpdated: () => void;
-  onCardDeleted: () => void;
+  onClick?: () => void;
+  onCardDeleted?: () => void;
 }
 
-export const Card = ({ card, onCardUpdated, onCardDeleted }: CardProps) => {
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [isHovered, setIsHovered] = useState(false);
+export function Card({ card, onClick, onCardDeleted }: CardProps) {
+  const { user } = useAuth();
 
   return (
-    <div className="relative">
-      <div
-        className="relative cursor-pointer"
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
-        onClick={() => setIsEditModalOpen(true)}
-      >
-        <img
-          src={card.imageUrl}
-          alt={card.playerName}
-          className="w-full h-auto rounded-lg shadow-md"
-        />
-        
-        {isHovered && (
-          <div className="absolute inset-0 bg-black bg-opacity-75 rounded-lg flex flex-col justify-center p-4 text-white">
-            <h3 className="text-xl font-bold">{card.playerName}</h3>
-            <p className="text-sm">{card.cardYear} {card.cardSet}</p>
-            <p className="text-sm">#{card.cardNumber}</p>
-            <p className="text-sm">Condition: {card.condition}</p>
-            <p className="text-sm">Paid: ${card.pricePaid.toFixed(2)}</p>
-            <p className="text-sm">Value: ${card.currentValue.toFixed(2)}</p>
-            {card.tags.length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-2">
-                {card.tags.map((tag, index) => (
-                  <span
-                    key={index}
-                    className="px-2 py-1 text-xs bg-indigo-600 rounded-full"
-                  >
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
+    <div
+      className="relative p-4 border rounded-lg shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+      onClick={onClick}
+    >
+      {card.imageUrl && (
+        <div className="w-48 h-64 overflow-hidden rounded-xl bg-gray-100 flex items-center justify-center mb-4">
+          <img
+            src={card.imageUrl || '/placeholder-card.png'}
+            alt={`${card.playerName} ${card.year} ${card.cardSet}`}
+            className="w-full h-full object-contain"
+          />
+        </div>
+      )}
+      <div className="space-y-2">
+        <h3 className="text-lg font-semibold">{card.playerName}</h3>
+        <p className="text-sm text-gray-600">
+          {card.year} {card.cardSet}
+        </p>
+        {card.variation && (
+          <p className="text-sm text-gray-600">{card.variation}</p>
         )}
+        <p className="text-sm text-gray-600">#{card.cardNumber}</p>
+        <p className="text-sm text-gray-600">Condition: {card.condition}</p>
+        <div className="flex justify-between text-sm">
+          <span className="text-gray-600">Paid: ${card.pricePaid}</span>
+          <span className="font-semibold">Value: ${card.currentValue}</span>
+        </div>
       </div>
-
-      <EditCardModal
-        card={card}
-        isOpen={isEditModalOpen}
-        onClose={() => setIsEditModalOpen(false)}
-        onCardUpdated={onCardUpdated}
-        onCardDeleted={onCardDeleted}
-      />
+      {user && (
+        <div className="absolute top-2 right-2">
+          <EmergencyDeleteButton
+            cardId={card.id}
+            onDeleted={onCardDeleted}
+          />
+        </div>
+      )}
     </div>
   );
-}; 
+} 

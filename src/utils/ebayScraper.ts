@@ -253,6 +253,7 @@ function calculateDemand(listings: GroupedListing[]): number {
 export function predictFuturePrices(listings: GroupedListing[], currentPrice: number, isRawCard: boolean = false) {
   // Ensure we have a valid current price
   if (!currentPrice || isNaN(currentPrice) || currentPrice <= 0) {
+    console.log("Invalid current price for prediction:", currentPrice);
     return {
       days30: 0,
       days60: 0,
@@ -359,17 +360,37 @@ export function predictFuturePrices(listings: GroupedListing[], currentPrice: nu
     });
     
     const n = priceData.length;
-    const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
-    const intercept = (sumY - slope * sumX) / n;
+    
+    // Check for potential division by zero
+    const denominator = (n * sumXX - sumX * sumX);
+    const slope = denominator !== 0 ? (n * sumXY - sumX * sumY) / denominator : 0;
+    const intercept = n !== 0 ? (sumY - slope * sumX) / n : currentPrice;
+    
+    // Safety check for invalid regression results
+    if (isNaN(slope) || isNaN(intercept) || !isFinite(slope) || !isFinite(intercept)) {
+      console.log("Invalid regression results:", { slope, intercept });
+      // Fallback to simple growth model
+      const growthRate = isRawCard ? 0.0025 : 0.01;
+      return {
+        days30: currentPrice * (1 + growthRate),
+        days60: currentPrice * (1 + growthRate * 2),
+        days90: currentPrice * (1 + growthRate * 3)
+      };
+    }
     
     // Calculate predicted future prices
     // For raw cards, dampen the slope (more conservative)
     const adjustedSlope = isRawCard ? slope * 0.3 : slope;
     
     // Predict prices at different points
-    const days30Price = intercept + adjustedSlope * (30);
-    const days60Price = intercept + adjustedSlope * (60);
-    const days90Price = intercept + adjustedSlope * (90);
+    let days30Price = intercept + adjustedSlope * (30);
+    let days60Price = intercept + adjustedSlope * (60);
+    let days90Price = intercept + adjustedSlope * (90);
+    
+    // Ensure predictions are positive numbers
+    days30Price = Math.max(0.01, isNaN(days30Price) ? currentPrice : days30Price);
+    days60Price = Math.max(0.01, isNaN(days60Price) ? currentPrice : days60Price);
+    days90Price = Math.max(0.01, isNaN(days90Price) ? currentPrice : days90Price);
     
     // Ensure predictions are not too extreme
     let maxIncreasePercent = isRawCard ? 1.1 : 1.3; // 10% for raw, 30% for graded max increase
@@ -393,24 +414,242 @@ export function predictFuturePrices(listings: GroupedListing[], currentPrice: nu
 }
 
 /**
- * Generate investment recommendation based on metrics
+ * Calculate an overall market score based on individual metrics
  */
-export function generateRecommendation(metrics: ReturnType<typeof calculateMarketMetrics>, roi: number) {
-  const { trend, volatility, demand } = metrics;
+export function calculateOverallMarketScore(metrics: ReturnType<typeof calculateMarketMetrics> | null): number {
+  if (!metrics) return 50; // Default middle score
   
-  if (trend > 70 && roi > 20) {
-    return { action: "BUY", reason: "Strong upward trend and good ROI potential" };
-  } else if (trend > 60 && demand > 70) {
-    return { action: "BUY", reason: "Positive trend with high market demand" };
-  } else if (trend < 40 && roi < 0) {
-    return { action: "SELL", reason: "Downward trend and current loss" };
-  } else if (trend < 45 && volatility > 70) {
-    return { action: "SELL", reason: "Declining price with high volatility" };
-  } else if (demand > 70 && volatility < 40) {
-    return { action: "HOLD", reason: "Stable prices with high demand" };
-  } else if (trend > 45 && trend < 55) {
-    return { action: "HOLD", reason: "Stable market conditions" };
-  } else {
-    return { action: "WATCH", reason: "Unclear market direction" };
+  // Extract key metrics
+  const { volatility, trend, demand } = metrics;
+  
+  // Weight factors (can be adjusted based on importance)
+  // Trend is weighted highest as it's most predictive of future value
+  const weights = {
+    trend: 0.5,      // Future direction is most important
+    demand: 0.3,     // Sales activity is next most important
+    volatility: 0.2  // Price stability is least weighted
+  };
+  
+  // Calculate weighted score - note that lower volatility is better
+  const volatilityScore = 100 - volatility; // Invert volatility (lower is better in raw form)
+  const overallScore = (
+    (trend * weights.trend) + 
+    (demand * weights.demand) + 
+    (volatilityScore * weights.volatility)
+  );
+  
+  // Round to nearest whole number
+  return Math.round(Math.max(0, Math.min(100, overallScore)));
+}
+
+/**
+ * Generate market recommendation with more detailed descriptions
+ */
+export function generateRecommendation(metrics: ReturnType<typeof calculateMarketMetrics> | null, roi: number = 0): {
+  action: string;
+  reason: string;
+  details: string;
+} {
+  if (!metrics) {
+    return {
+      action: 'WATCH',
+      reason: 'Insufficient data to make a recommendation.',
+      details: 'Consider researching this card further before making investment decisions.'
+    };
   }
+  
+  const { trend, volatility, demand } = metrics;
+  const overallScore = calculateOverallMarketScore(metrics);
+  
+  // Default recommendation
+  let action = 'HOLD';
+  let reason = '';
+  let details = '';
+  
+  // Determine action based on metrics
+  if (trend > 70 && demand > 60 && volatility < 50) {
+    action = 'BUY';
+    reason = 'Strong positive trend with good demand and stable prices.';
+    details = `The market for this card is showing excellent growth potential (trend: ${trend}%) with healthy demand (${demand}%) and relatively stable pricing (volatility: ${volatility}%). This combination typically indicates a card that may continue to appreciate in value.`;
+  } else if (trend > 60 && demand > 50) {
+    action = 'BUY';
+    reason = 'Positive trend with decent demand shows growth potential.';
+    details = `This card shows promising growth (trend: ${trend}%) with adequate market activity (demand: ${demand}%). While volatility is at ${volatility}%, the positive indicators suggest this could be a good addition to your collection.`;
+  } else if (trend < 30 && volatility > 60) {
+    action = 'SELL';
+    reason = 'Downward trend with high price volatility suggests declining value.';
+    details = `This card is showing concerning market signals with a downward trend (${trend}%) and high price instability (volatility: ${volatility}%). These conditions often precede further price drops.`;
+  } else if (trend < 40 && roi > 20) {
+    action = 'SELL';
+    reason = 'Market is cooling while you have a positive ROI.';
+    details = `With your current ROI of ${roi.toFixed(1)}% and the market showing signs of cooling (trend: ${trend}%), this may be a good time to lock in your profits.`;
+  } else if (volatility > 70 && demand < 40) {
+    action = 'WATCH';
+    reason = 'High volatility with low demand indicates an unstable market.';
+    details = `The combination of high price fluctuations (volatility: ${volatility}%) and weak buying interest (demand: ${demand}%) suggests waiting for the market to stabilize before making decisions.`;
+  } else if (demand < 30) {
+    action = 'WATCH';
+    reason = 'Very low demand may make it difficult to sell.';
+    details = `With minimal market activity (demand: ${demand}%), this card may be difficult to sell at a fair price. Consider waiting for increased collector interest.`;
+  } else {
+    action = 'HOLD';
+    reason = 'Stable market conditions with no strong indicators either way.';
+    details = `This card is showing balanced market metrics (trend: ${trend}%, demand: ${demand}%, volatility: ${volatility}%) without any strong buy or sell signals. If you own it, holding may be best until clearer trends emerge.`;
+  }
+  
+  // Adjust based on ROI if available
+  if (roi > 50 && action !== 'SELL') {
+    action = 'CONSIDER SELLING';
+    reason = 'You have a significant ROI that may be worth securing.';
+    details = `With your excellent ROI of ${roi.toFixed(1)}%, you might consider taking profits, especially if this card represents a significant portion of your collection value.`;
+  } else if (roi < -20 && action !== 'BUY') {
+    action = 'CONSIDER CUTTING LOSSES';
+    reason = 'Significant negative ROI with no strong recovery indicators.';
+    details = `Your current loss of ${Math.abs(roi).toFixed(1)}% combined with market metrics (trend: ${trend}%, demand: ${demand}%) suggests considering whether to reallocate your investment to more promising cards.`;
+  }
+  
+  return { action, reason, details };
+}
+
+/**
+ * Calculate potential profit from grading a raw card
+ */
+export function calculateGradingProfit(rawPrice: number, psa9Price: number, psa10Price: number, psa9Odds: number = 0.60, psa10Odds: number = 0.15) {
+  // Standard costs (in USD)
+  const gradingCosts = {
+    psaRegular: 50,       // Regular PSA grading fee
+    psaExpress: 150,      // Express PSA grading fee
+    shippingToGrader: 15, // Shipping to grading company
+    shippingToSeller: 5,  // Shipping to buyer after graded
+    ebayFeePercent: 0.13  // 13% eBay fee (typical)
+  };
+  
+  // Calculate expected value based on odds
+  const expectedGradedValue = (psa9Price * psa9Odds) + (psa10Price * psa10Odds);
+  
+  // Calculate costs
+  const totalCost = rawPrice + gradingCosts.psaRegular + gradingCosts.shippingToGrader + gradingCosts.shippingToSeller;
+  
+  // Calculate expected revenue after fees
+  const expectedRevenue = expectedGradedValue * (1 - gradingCosts.ebayFeePercent);
+  
+  // Calculate profit
+  const expectedProfit = expectedRevenue - totalCost;
+  const roi = (expectedProfit / totalCost) * 100;
+  
+  // Calculate individual outcomes
+  const psa9Profit = (psa9Price * (1 - gradingCosts.ebayFeePercent)) - totalCost;
+  const psa10Profit = (psa10Price * (1 - gradingCosts.ebayFeePercent)) - totalCost;
+  
+  return {
+    expectedProfit,
+    roi,
+    psa9Profit,
+    psa10Profit,
+    gradingCost: gradingCosts.psaRegular,
+    totalCost,
+    expectedValue: expectedGradedValue,
+    ebayFee: gradingCosts.ebayFeePercent * expectedGradedValue
+  };
+}
+
+/**
+ * Format a number as currency
+ */
+export function formatCurrency(value: number): string {
+  if (!value && value !== 0) return '$0';
+  return '$' + value.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,');
+}
+
+/**
+ * Analyze sales data to extract trends
+ */
+export function analyzeSalesData(listings: GroupedListing[]): {
+  prices: number[];
+  dates: Date[];
+  trend: number;
+  volatility: number;
+} {
+  // Extract prices and dates
+  const prices: number[] = [];
+  const dates: Date[] = [];
+  
+  // Process each listing 
+  for (const listing of listings) {
+    if (listing.price > 0) {
+      prices.push(listing.price);
+      
+      // Try to extract date
+      let listingDate: Date | null = null;
+      if (listing.dateSold) {
+        try {
+          listingDate = new Date(listing.dateSold);
+        } catch {
+          // Skip invalid dates
+        }
+      }
+      
+      if (!listingDate && listing.date) {
+        try {
+          listingDate = new Date(listing.date);
+        } catch {
+          // Skip invalid dates
+        }
+      }
+      
+      if (listingDate && !isNaN(listingDate.getTime())) {
+        dates.push(listingDate);
+      }
+    }
+  }
+  
+  // Calculate trend
+  let trend = 50; // Default neutral trend
+  if (prices.length >= 3 && dates.length >= 3) {
+    // Sort data by date
+    const sortedData = dates.map((date, index) => ({
+      date: date.getTime(),
+      price: prices[index] || 0
+    })).sort((a, b) => a.date - b.date);
+    
+    // Simple linear regression
+    const n = sortedData.length;
+    const sumX = sortedData.reduce((sum, point) => sum + point.date, 0);
+    const sumY = sortedData.reduce((sum, point) => sum + point.price, 0);
+    const sumXY = sortedData.reduce((sum, point) => sum + (point.date * point.price), 0);
+    const sumXX = sortedData.reduce((sum, point) => sum + (point.date * point.date), 0);
+    
+    const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+    
+    // Convert slope to a trend score (0-100)
+    const avgPrice = sumY / n;
+    const relativeTrend = (slope * 30 * 24 * 60 * 60 * 1000) / avgPrice; // Trend over 30 days
+    
+    // Map relative trend to 0-100 scale
+    trend = 50 + (relativeTrend * 500); // Scale factor can be adjusted
+    trend = Math.max(0, Math.min(100, trend)); // Clamp to 0-100
+  }
+  
+  // Calculate volatility
+  let volatility = 50; // Default medium volatility
+  if (prices.length >= 2) {
+    // Calculate standard deviation
+    const avgPrice = prices.reduce((sum, price) => sum + price, 0) / prices.length;
+    const variance = prices.reduce((sum, price) => sum + Math.pow(price - avgPrice, 2), 0) / prices.length;
+    const stdDev = Math.sqrt(variance);
+    
+    // Relative volatility (coefficient of variation)
+    const relativeVolatility = (stdDev / avgPrice);
+    
+    // Map to 0-100 scale
+    volatility = relativeVolatility * 200; // Scale factor can be adjusted
+    volatility = Math.max(0, Math.min(100, volatility)); // Clamp to 0-100
+  }
+  
+  return {
+    prices,
+    dates,
+    trend,
+    volatility
+  };
 } 

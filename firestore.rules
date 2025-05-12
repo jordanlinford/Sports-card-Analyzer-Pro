@@ -1,0 +1,107 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper function to check if user owns the document
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Rules for user collections
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+      
+      // Rules for user's collection subcollection
+      match /collection/{document=**} {
+        allow read, write: if isOwner(userId);
+      }
+      
+      // Rules for user's cards subcollection (legacy path)
+      match /cards/{document=**} {
+        allow read, write: if isOwner(userId);
+      }
+      
+      // Rules for user's saved searches subcollection
+      match /saved_searches/{document=**} {
+        allow read, write: if isOwner(userId);
+      }
+      
+      // Rules for user's display cases
+      match /display_cases/{displayCaseId} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+
+    // Rules for display cases
+    match /display_cases/{displayCaseId} {
+      allow read: if true;  // Public read access
+      allow write: if isAuthenticated() && 
+        (resource == null || resource.data.userId == request.auth.uid);
+        
+      // Allow comments on display cases
+      match /comments/{commentId} {
+        allow read: if true; // Anyone can read comments
+        allow create: if isAuthenticated();
+        allow update, delete: if isAuthenticated() && 
+          (resource == null || resource.data.uid == request.auth.uid);
+      }
+    }
+    
+    // Rules for public display cases
+    match /public_display_cases/{displayCaseId} {
+      allow read: if true;  // Everyone can read public display cases
+      
+      // Allow create/update if user owns the display case OR this is a recovery operation
+      allow create, update: if isAuthenticated() && (
+        request.resource.data.userId == request.auth.uid || 
+        request.resource.data.recovered == true
+      );
+      
+      allow delete: if isAuthenticated() && (
+        resource == null || resource.data.userId == request.auth.uid
+      );
+    }
+
+    // Allow access to the root collection for backward compatibility
+    match /cards/{document=**} {
+      allow read, write: if isAuthenticated();
+    }
+    
+    // Rules for likes collection
+    match /likes/{likeId} {
+      allow read: if true; // Anyone can see who has liked something
+      allow create: if true; // Allow anyone to like without authentication 
+      allow delete: if true; // Allow anyone to unlike
+    }
+    
+    // Rules for messages
+    match /messages/{messageId} {
+      // Users can read messages only if they are the sender or recipient
+      allow read: if isAuthenticated() && 
+        (resource.data.senderId == request.auth.uid || resource.data.recipientId == request.auth.uid);
+      
+      // Users can create messages if they're authenticated and set themselves as sender
+      allow create: if isAuthenticated() && request.resource.data.senderId == request.auth.uid;
+      
+      // Only recipients can mark messages as read
+      allow update: if isAuthenticated() && 
+        resource.data.recipientId == request.auth.uid && 
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+      
+      // Sender can delete their sent messages
+      allow delete: if isAuthenticated() && resource.data.senderId == request.auth.uid;
+    }
+    
+    // Rules for user actions (for spam prevention)
+    match /userActions/{actionId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      // No update or delete - these are permanent records for rate limiting
+    }
+  }
+} 

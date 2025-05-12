@@ -480,12 +480,87 @@ app.post('/api/scrape', async (req, res) => {
     console.log("Received scrape request with body:", req.body);
     const searchParams = req.body;
     
-    // Validate required parameters
-    if (!searchParams || !searchParams.playerName) {
+    // Check if the request is empty or missing both query and playerName
+    if (!searchParams || ((!searchParams.query || searchParams.query.trim() === '') && 
+                         (!searchParams.playerName || searchParams.playerName.trim() === ''))) {
+      console.error("Missing required parameters: either query or playerName is required");
+      return res.status(400).json({ 
+        error: 'Missing required parameter', 
+        message: 'Either a search query or player name is required',
+        listings: [], 
+        count: 0 
+      });
+    }
+    
+    // Check if using free text query or structured fields
+    if (searchParams.query && searchParams.query.trim() !== '') {
+      // If using free text query, search directly with that query
+      console.log("Using free text query:", searchParams.query);
+      
+      // Pass through any grade/condition filter
+      const isRaw = searchParams.grade === 'Raw';
+      
+      // Search with the exact query string
+      const listings = await searchWithExactQuery(searchParams.query, isRaw);
+      
+      // Filter by grade/condition if specified
+      let filteredListings = listings;
+      if (searchParams.grade && searchParams.grade !== 'any') {
+        console.log(`Filtering by grade: ${searchParams.grade}`);
+        const gradeLower = searchParams.grade.toLowerCase();
+        
+        filteredListings = listings.filter(listing => {
+          const titleLower = listing.title.toLowerCase();
+          
+          // For Raw cards, exclude any listings with grading terms
+          if (gradeLower === 'raw') {
+            const gradingTerms = ['psa', 'bgs', 'sgc', 'cgc', 'graded'];
+            return !gradingTerms.some(term => titleLower.includes(term));
+          }
+          
+          // For specific grades, include only those with matching grade
+          return titleLower.includes(gradeLower);
+        });
+      }
+      
+      // Apply negative keywords filter if any
+      if (searchParams.negKeywords && searchParams.negKeywords.length > 0) {
+        filteredListings = filteredListings.filter(listing => {
+          const titleLower = listing.title.toLowerCase();
+          return !searchParams.negKeywords.some(
+            keyword => keyword && titleLower.includes(keyword.toLowerCase())
+          );
+        });
+      }
+      
+      console.log(`Query "${searchParams.query}": found ${listings.length} listings, filtered to ${filteredListings.length}`);
+      
+      // Generate synthetic data if no results found
+      if (filteredListings.length === 0) {
+        console.log(`No results found for "${searchParams.query}", generating synthetic data`);
+        const syntheticData = generateSyntheticDataFromQuery(searchParams.query, searchParams.grade);
+        return res.json({
+          success: true,
+          listings: syntheticData,
+          count: syntheticData.length,
+          query: searchParams.query,
+          isSynthetic: true
+        });
+      }
+      
+      return res.json({
+        success: true,
+        listings: filteredListings,
+        count: filteredListings.length,
+        query: searchParams.query
+      });
+    }
+    // Using structured search approach - validate playerName is present
+    else if (!searchParams.playerName || searchParams.playerName.trim() === '') {
       console.error("Missing required parameter: playerName");
       return res.status(400).json({ 
         error: 'Missing required parameter', 
-        message: 'Player name is required',
+        message: 'Player name is required for structured search',
         listings: [], 
         count: 0 
       });
@@ -1455,3 +1530,63 @@ app.post('/api/exact-search', async (req, res) => {
     });
   }
 });
+
+/**
+ * Generate synthetic data from a free text query
+ */
+function generateSyntheticDataFromQuery(query, grade = 'any') {
+  console.log(`Generating synthetic data for query: "${query}" with grade: ${grade}`);
+  
+  // Extract possible year
+  const yearMatch = query.match(/\b(19|20)\d{2}\b/);
+  const year = yearMatch ? yearMatch[0] : new Date().getFullYear().toString();
+  
+  // Extract possible player name (first 2-3 words)
+  const words = query.split(/\s+/);
+  const playerName = words.slice(0, Math.min(3, words.length)).join(' ');
+  
+  // Generate a reasonable price based on the query
+  let basePrice = 20; // Default fallback price
+  
+  // Adjust price based on grade
+  if (grade !== 'any' && grade !== 'Raw') {
+    // High grades command premium prices
+    if (grade.includes('10') || grade.includes('9.5')) {
+      basePrice *= 5;
+    } else if (grade.includes('9')) {
+      basePrice *= 2;
+    }
+  }
+  
+  // Create synthetic listings
+  const syntheticListings = [];
+  const now = new Date();
+  
+  // Generate multiple data points over the last 3 months
+  for (let i = 0; i < 5; i++) {
+    const daysAgo = Math.floor(Math.random() * 90); // Random distribution over 90 days
+    const date = new Date(now);
+    date.setDate(date.getDate() - daysAgo);
+    
+    // Add random variation to price
+    const variation = (Math.random() * 0.3) - 0.15; // ±15%
+    const price = basePrice * (1 + variation);
+    
+    syntheticListings.push({
+      title: `${year} ${playerName} ${grade !== 'any' && grade !== 'Raw' ? grade : ''}`,
+      price,
+      shipping: Math.random() > 0.5 ? 4.99 : 0, // 50% chance of free shipping
+      totalPrice: price + (Math.random() > 0.5 ? 4.99 : 0),
+      date: date.toISOString(),
+      dateSold: date.toISOString().split('T')[0],
+      url: '#',
+      imageUrl: 'https://via.placeholder.com/300?text=Card+Image+Unavailable',
+      source: 'Synthetic'
+    });
+  }
+  
+  // Sort by date, newest first
+  syntheticListings.sort((a, b) => new Date(b.dateSold).getTime() - new Date(a.dateSold).getTime());
+  
+  return syntheticListings;
+}

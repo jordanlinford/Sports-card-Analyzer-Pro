@@ -1,292 +1,219 @@
-import { useState } from 'react';
-import { Card as CardType, CardService } from '../services/CardService';
-import { uploadImage } from '../utils/imageUpload';
-import { useAuth } from '../contexts/AuthContext';
-import { MarketValueService } from '../services/MarketValueService';
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { useAuth } from "@/context/AuthContext";
+import { useCards } from "@/hooks/useCards";
+import { uploadCardImage } from "@/lib/firebase/storage";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { toast } from "sonner";
+
+// ✅ Include 'tags' as optional string input
+const cardFormSchema = z.object({
+  playerName: z.string().min(1, "Player name is required"),
+  year: z.string().min(1, "Year is required"),
+  cardSet: z.string().min(1, "Card set is required"),
+  variation: z.string().optional(),
+  cardNumber: z.string().min(1, "Card number is required"),
+  condition: z.string().min(1, "Condition is required"),
+  pricePaid: z.number().optional(),
+  currentValue: z.number().optional(),
+  image: z.instanceof(File).optional(),
+  tags: z.string().optional(), // free-form string
+});
+
+type CardFormData = z.infer<typeof cardFormSchema>;
 
 interface AddCardModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onCardAdded: () => void;
+  onCardAdded?: () => void;
 }
 
-export const AddCardModal = ({ isOpen, onClose, onCardAdded }: AddCardModalProps) => {
-  const { currentUser } = useAuth();
-  const [card, setCard] = useState<Partial<CardType>>({
-    playerName: '',
-    year: '',
-    cardSet: '',
-    variation: '',
-    cardNumber: '',
-    condition: 'Mint',
-    grade: '',
-    purchasePrice: 0,
-    purchaseDate: new Date().toISOString().split('T')[0],
-    notes: '',
-    imageUrl: '',
-    ownerId: currentUser?.uid || '',
-  });
-  const [imageFile, setImageFile] = useState<File | null>(null);
+export function AddCardModal({ isOpen, onClose, onCardAdded }: AddCardModalProps) {
+  const { user } = useAuth();
+  const { addCard } = useCards();
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [isFetchingPrice, setIsFetchingPrice] = useState(false);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setCard(prev => ({ ...prev, [name]: value }));
-  };
+  const {
+    register,
+    handleSubmit,
+    reset,
+    setValue,
+    formState: { errors },
+  } = useForm<CardFormData>({
+    resolver: zodResolver(cardFormSchema),
+  });
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setImageFile(e.target.files[0]);
-    }
-  };
-
-  const handleFetchPrice = async () => {
-    if (!card.playerName || !card.condition) {
-      setError('Player name and condition are required to fetch price');
-      return;
-    }
-
-    setIsFetchingPrice(true);
-    setError(null);
+  const onSubmit = async (data: CardFormData) => {
+    if (!user) return;
 
     try {
-      const marketValue = await MarketValueService.fetchCardMarketValue({
-        playerName: card.playerName,
-        year: card.year,
-        cardSet: card.cardSet,
-        variation: card.variation,
-        cardNumber: card.cardNumber,
-        condition: card.condition,
+      setIsLoading(true);
+      let imageUrl: string | undefined;
+
+      if (data.image) {
+        imageUrl = await uploadCardImage(data.image, user.uid);
+      }
+
+      const { image, tags, ...rest } = data;
+
+      const cardToAdd = {
+        ...rest,
+        ownerId: user.uid,
+        ...(imageUrl ? { imageUrl } : {}),
+        ...(tags
+          ? { tags: tags.split(",").map((tag) => tag.trim()).filter(Boolean) }
+          : {}),
+      };
+
+      await addCard({
+        ...cardToAdd,
+        tags: cardToAdd.tags || []
       });
 
-      if (marketValue !== null) {
-        setCard(prev => ({ ...prev, purchasePrice: marketValue }));
-      } else {
-        setError('Could not fetch market value for this card');
-      }
-    } catch (err) {
-      setError('Error fetching market value');
-    } finally {
-      setIsFetchingPrice(false);
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!currentUser) {
-      setError('You must be logged in to add a card');
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      let imageUrl = '';
-      if (imageFile) {
-        imageUrl = await uploadImage(imageFile, currentUser.uid);
-      }
-
-      const newCard = {
-        ...card,
-        imageUrl,
-        ownerId: currentUser.uid,
-      } as CardType;
-
-      await CardService.createCard(newCard);
-      onCardAdded();
+      reset();
       onClose();
-    } catch (err) {
-      setError('Failed to add card');
+      onCardAdded?.();
+      toast.success("Card added successfully");
+    } catch (error) {
+      console.error("Error adding card:", error);
+      toast.error("Failed to add card");
     } finally {
       setIsLoading(false);
     }
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <h2 className="text-2xl font-bold mb-4">Add New Card</h2>
-        
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="playerName" className="block text-sm font-medium text-gray-700">Player Name *</label>
-              <input
-                id="playerName"
-                type="text"
-                name="playerName"
-                value={card.playerName}
-                onChange={handleInputChange}
-                required
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="year" className="block text-sm font-medium text-gray-700">Year</label>
-              <input
-                id="year"
-                type="text"
-                name="year"
-                value={card.year}
-                onChange={handleInputChange}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="cardSet" className="block text-sm font-medium text-gray-700">Card Set</label>
-              <input
-                id="cardSet"
-                type="text"
-                name="cardSet"
-                value={card.cardSet}
-                onChange={handleInputChange}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="variation" className="block text-sm font-medium text-gray-700">Variation</label>
-              <input
-                id="variation"
-                type="text"
-                name="variation"
-                value={card.variation}
-                onChange={handleInputChange}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="cardNumber" className="block text-sm font-medium text-gray-700">Card Number</label>
-              <input
-                id="cardNumber"
-                type="text"
-                name="cardNumber"
-                value={card.cardNumber}
-                onChange={handleInputChange}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="condition" className="block text-sm font-medium text-gray-700">Condition *</label>
-              <select
-                id="condition"
-                name="condition"
-                value={card.condition}
-                onChange={handleInputChange}
-                required
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-              >
-                <option value="Mint">Mint</option>
-                <option value="Near Mint">Near Mint</option>
-                <option value="Excellent">Excellent</option>
-                <option value="Very Good">Very Good</option>
-                <option value="Good">Good</option>
-                <option value="Poor">Poor</option>
-              </select>
-            </div>
-
-            <div>
-              <label htmlFor="grade" className="block text-sm font-medium text-gray-700">Grade</label>
-              <input
-                id="grade"
-                type="text"
-                name="grade"
-                value={card.grade}
-                onChange={handleInputChange}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="purchasePrice" className="block text-sm font-medium text-gray-700">Purchase Price</label>
-              <div className="flex gap-2">
-                <input
-                  id="purchasePrice"
-                  type="number"
-                  name="purchasePrice"
-                  value={card.purchasePrice}
-                  onChange={handleInputChange}
-                  step="0.01"
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                />
-                <button
-                  type="button"
-                  onClick={handleFetchPrice}
-                  disabled={isFetchingPrice}
-                  className="mt-1 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:bg-indigo-300"
-                >
-                  {isFetchingPrice ? 'Fetching...' : 'Fetch Price'}
-                </button>
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor="purchaseDate" className="block text-sm font-medium text-gray-700">Purchase Date</label>
-              <input
-                id="purchaseDate"
-                type="date"
-                name="purchaseDate"
-                value={card.purchaseDate}
-                onChange={handleInputChange}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-              />
-            </div>
-
-            <div className="md:col-span-2">
-              <label htmlFor="notes" className="block text-sm font-medium text-gray-700">Notes</label>
-              <textarea
-                id="notes"
-                name="notes"
-                value={card.notes}
-                onChange={handleInputChange}
-                rows={3}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-              />
-            </div>
-
-            <div className="md:col-span-2">
-              <label htmlFor="image" className="block text-sm font-medium text-gray-700">Card Image</label>
-              <input
-                id="image"
-                type="file"
-                accept="image/*"
-                onChange={handleImageChange}
-                className="mt-1 block w-full"
-              />
-            </div>
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto bg-white">
+        <DialogHeader>
+          <DialogTitle className="text-2xl font-bold text-gray-900">
+            Add New Card
+          </DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-900">Player Name</label>
+            <Input {...register("playerName")} className="mt-1" />
+            {errors.playerName && (
+              <p className="mt-1 text-sm text-red-500">{errors.playerName.message}</p>
+            )}
           </div>
 
-          {error && (
-            <div className="text-red-600 text-sm mt-2">{error}</div>
-          )}
+          <div>
+            <label className="block text-sm font-medium text-gray-900">Year</label>
+            <Input {...register("year")} className="mt-1" />
+            {errors.year && (
+              <p className="mt-1 text-sm text-red-500">{errors.year.message}</p>
+            )}
+          </div>
 
-          <div className="flex justify-end gap-4 mt-6">
-            <button
+          <div>
+            <label className="block text-sm font-medium text-gray-900">Card Set</label>
+            <Input {...register("cardSet")} className="mt-1" />
+            {errors.cardSet && (
+              <p className="mt-1 text-sm text-red-500">{errors.cardSet.message}</p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-900">Variation (Optional)</label>
+            <Input {...register("variation")} className="mt-1" />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-900">Card Number</label>
+            <Input {...register("cardNumber")} className="mt-1" />
+            {errors.cardNumber && (
+              <p className="mt-1 text-sm text-red-500">{errors.cardNumber.message}</p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-900">Condition</label>
+            <Input
+              {...register("condition")}
+              placeholder="Enter condition (e.g., PSA 9, Raw, etc.)"
+              className="mt-1"
+            />
+            {errors.condition && (
+              <p className="mt-1 text-sm text-red-500">{errors.condition.message}</p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-900">Price Paid</label>
+            <Input
+              type="number"
+              step="0.01"
+              {...register("pricePaid", { valueAsNumber: true })}
+              className="mt-1"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-900">Current Value</label>
+            <Input
+              type="number"
+              step="0.01"
+              {...register("currentValue", { valueAsNumber: true })}
+              className="mt-1"
+            />
+          </div>
+
+          {/* ✅ Tags field */}
+          <div>
+            <label className="block text-sm font-medium text-gray-900">
+              Tags (comma separated)
+            </label>
+            <Input
+              {...register("tags")}
+              placeholder="e.g. Rookie, Jazz, Holo"
+              className="mt-1"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-900">
+              Card Image (Optional)
+            </label>
+            <Input
+              type="file"
+              accept="image/*"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  setValue("image", file);
+                }
+              }}
+              className="mt-1"
+            />
+          </div>
+
+          <div className="flex justify-end gap-4 pt-4">
+            <Button
               type="button"
+              variant="outline"
               onClick={onClose}
-              className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+              disabled={isLoading}
+              className="text-gray-900"
             >
               Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:bg-indigo-300"
-            >
-              {isLoading ? 'Adding...' : 'Add Card'}
-            </button>
+            </Button>
+            <Button type="submit" disabled={isLoading}>
+              {isLoading ? "Adding..." : "Add Card"}
+            </Button>
           </div>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
-}; 
+}

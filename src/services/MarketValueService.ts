@@ -1,27 +1,43 @@
-interface CardRequest {
-  playerName: string;
-  year?: string;
-  cardSet?: string;
-  variation?: string;
-  cardNumber?: string;
+import { Card } from './CardService';
+import { doc, getDocs, updateDoc, collection } from 'firebase/firestore';
+import { db } from '../lib/firebase';
+
+const BASE_URL = import.meta.env.VITE_SCRAPER_API;
+
+if (!BASE_URL) {
+  throw new Error('VITE_SCRAPER_API environment variable is not set');
+}
+
+interface CardPriceResult {
+  price: number;
+  source: string;
+  timestamp: string;
+}
+
+interface CardDetails {
+  player: string;
+  year: string;
+  set: string;
+  number: string;
   condition: string;
 }
 
 export class MarketValueService {
-  private static readonly API_URL = 'http://localhost:8000';
-
-  static async fetchCardMarketValue(card: CardRequest): Promise<number | null> {
+  static async fetchCardMarketValue(card: Card): Promise<number | null> {
     try {
-      const response = await fetch(`${this.API_URL}/fetch-price`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(card),
-      });
+      const queryParams = {
+        player: card.playerName,
+        year: card.year,
+        set: card.brand,
+        number: card.cardNumber,
+        condition: card.grade || 'ungraded',
+      };
+
+      const query = new URLSearchParams(queryParams as Record<string, string>).toString();
+      const response = await fetch(`${BASE_URL}/api/fetch-price?${query}`);
 
       if (!response.ok) {
-        throw new Error('Failed to fetch market value');
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const data = await response.json();
@@ -29,6 +45,67 @@ export class MarketValueService {
     } catch (error) {
       console.error('Error fetching market value:', error);
       return null;
+    }
+  }
+
+  static async fetchLatestCardPrice(cardDetails: CardDetails): Promise<CardPriceResult> {
+    try {
+      const queryParams = new URLSearchParams({
+        player: cardDetails.player,
+        year: cardDetails.year,
+        set: cardDetails.set,
+        number: cardDetails.number,
+        condition: cardDetails.condition,
+      });
+
+      const response = await fetch(`${BASE_URL}/api/fetch-price?${queryParams}`);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch card price: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return {
+        price: data.price || 0,
+        source: data.source || 'Unknown',
+        timestamp: new Date().toISOString(),
+      };
+    } catch (error) {
+      console.error('Error fetching card price:', error);
+      throw error;
+    }
+  }
+
+  static async updateAllCardValues(userId: string): Promise<void> {
+    try {
+      const cardsRef = collection(db, 'users', userId, 'cards');
+      const snapshot = await getDocs(cardsRef);
+      
+      for (const docSnap of snapshot.docs) {
+        const card = docSnap.data();
+        try {
+          const result = await this.fetchLatestCardPrice({
+            player: card.playerName,
+            year: card.year,
+            set: card.brand,
+            number: card.cardNumber,
+            condition: card.grade || 'ungraded',
+          });
+
+          await updateDoc(docSnap.ref, {
+            currentValue: result.price,
+            lastUpdated: result.timestamp,
+            priceSource: result.source,
+          });
+        } catch (error) {
+          console.error(`Failed to update card ${card.playerName}:`, error);
+          // Continue with the next card even if this one fails
+          continue;
+        }
+      }
+    } catch (error) {
+      console.error('Error updating card values:', error);
+      throw error;
     }
   }
 } 

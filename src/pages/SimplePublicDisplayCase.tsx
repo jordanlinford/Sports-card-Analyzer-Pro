@@ -254,7 +254,7 @@ export default function SimplePublicDisplayCase() {
             publicId={displayCase.id} 
             title={displayCase.name}
           />
-          {user && displayCase.userId && (
+          {displayCase.userId && (
             <MessageSellerButton 
               sellerId={displayCase.userId} 
               displayCaseId={displayCase.id}

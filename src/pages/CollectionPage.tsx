@@ -388,7 +388,7 @@ const CollectionPage: React.FC = () => {
               "Update All Card Values"
             )}
           </Button>
-          <Button onClick={handleOpenAddCardModal}>+ Add Card</Button>
+        <Button onClick={handleOpenAddCardModal}>+ Add Card</Button>
         </div>
       </div>
 

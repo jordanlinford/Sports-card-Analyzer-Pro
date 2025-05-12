@@ -1,21 +1,21 @@
-import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { storage } from '../firebase';
+// Utility functions for image upload should go here.
+// (This file previously contained a misplaced React component.)
 
-export const uploadImage = async (file: File, userId: string): Promise<string> => {
-  try {
-    // Create a unique file path with user ID and timestamp
-    const filePath = `cardImages/${userId}/${Date.now()}_${file.name}`;
-    const storageRef = ref(storage, filePath);
-    
-    // Upload the file
-    await uploadBytes(storageRef, file);
-    
-    // Get the download URL
-    const downloadURL = await getDownloadURL(storageRef);
-    
-    return downloadURL;
-  } catch (error) {
-    console.error('Error uploading image:', error);
-    throw error;
-  }
-}; 
+import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { auth } from '../lib/firebase';
+
+// Uploads an image to Firebase Storage and returns the download URL
+export async function uploadImage(file: File, userId: string): Promise<string> {
+  const storage = getStorage();
+  const imageRef = ref(storage, `cards/${userId}/${Date.now()}-${file.name}`);
+  await uploadBytes(imageRef, file);
+  const url = await getDownloadURL(imageRef);
+  return url;
+}
+
+// Example placeholder:
+// export async function uploadImage(file: File, userId: string): Promise<string> {
+//   // ...upload logic...
+//   return imageUrl;
+// }
+

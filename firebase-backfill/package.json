@@ -1,0 +1,13 @@
+{
+  "name": "firebase-backfill-script",
+  "version": "1.0.0",
+  "description": "Script to backfill ownerId in Firebase documents",
+  "main": "backfillOwnerId.js",
+  "type": "module",
+  "scripts": {
+    "start": "node backfillOwnerId.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^11.0.0"
+  }
+} 

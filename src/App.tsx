@@ -6,10 +6,15 @@ import CollectionPage from './pages/CollectionPage';
 import Login from './pages/Login';
 import Layout from './components/Layout';
 import PublicDisplayCase from './pages/PublicDisplayCase';
+import SimplePublicDisplayCase from './pages/SimplePublicDisplayCase';
 import DisplayCases from './pages/DisplayCases';
 import DisplayCasePage from './pages/DisplayCasePage';
+import MarketAnalyzerPage from './pages/MarketAnalyzerPage';
+import TradeAnalyzer from './pages/TradeAnalyzer';
+import SharedTradeView from './pages/SharedTradeView';
 import Home from './pages/index';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import ProfilePage from './pages/profile';
 
 const App: React.FC = () => {
   console.log('App component rendering...');
@@ -39,6 +44,22 @@ const App: React.FC = () => {
             } 
           />
           <Route 
+            path="/market-analyzer" 
+            element={<MarketAnalyzerPage />} 
+          />
+          <Route 
+            path="/trade-analyzer" 
+            element={
+              <ProtectedRoute>
+                <TradeAnalyzer />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/trade-analyzer/share/:tradeData" 
+            element={<SharedTradeView />} 
+          />
+          <Route 
             path="/login" 
             element={<Login />} 
           />
@@ -52,7 +73,11 @@ const App: React.FC = () => {
           />
           <Route 
             path="/display/:publicId" 
-            element={<PublicDisplayCase />} 
+            element={<SimplePublicDisplayCase />} 
+          />
+          <Route 
+            path="/profile" 
+            element={<ProfilePage />} 
           />
         </Routes>
       </Layout>

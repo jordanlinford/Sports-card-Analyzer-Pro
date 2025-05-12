@@ -1,0 +1,1 @@
+import { DirectFixer } from '@/components/display-cases/DirectFixer';

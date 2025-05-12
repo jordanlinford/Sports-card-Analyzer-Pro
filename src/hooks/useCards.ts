@@ -5,10 +5,16 @@ import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
 
 export function useCards() {
-  const { user, loading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const queryClient = useQueryClient();
 
-  const { data, isLoading, error } = useQuery<Card[], Error>({
+  const { 
+    data, 
+    isLoading: cardsLoading, 
+    error, 
+    isFetching,
+    refetch 
+  } = useQuery<Card[], Error>({
     queryKey: ["cards", user?.uid],
     queryFn: async () => {
       if (!user?.uid) {
@@ -37,17 +43,20 @@ export function useCards() {
         return processedCards;
       } catch (err) {
         console.error("useCards: Error while fetching cards:", err);
+        toast.error("Failed to load cards. Please try again.");
         throw err;
       }
     },
-    enabled: !!user?.uid && !loading,
-    retry: 1
+    enabled: !!user?.uid && !authLoading,
+    retry: 2,
+    retryDelay: attempt => Math.min(attempt > 1 ? 2000 : 1000, 30 * 1000),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    refetchOnWindowFocus: false
   });
 
-  // Show error toast when query fails
+  // Force a fresh retry on error
   if (error) {
     console.error("useCards: Error fetching cards:", error);
-    toast.error("Failed to load cards. Please try again.");
   }
 
   const addCardMutation = useMutation({
@@ -85,16 +94,29 @@ export function useCards() {
         console.error("useCards: No user ID available for deleteCard");
         throw new Error("You must be logged in to delete cards");
       }
+      
       try {
+        console.log(`useCards: Calling deleteCard with cardId=${cardId}, userId=${user.uid}`);
         await deleteCard(cardId, user.uid);
         console.log("useCards: Successfully deleted card", cardId);
         return cardId;
       } catch (error) {
         console.error("useCards: Error in deleteCard mutation:", error);
+        // Check if Firebase returned a specific error code
+        if (error instanceof Error) {
+          const errorString = error.toString();
+          
+          if (errorString.includes("permission-denied")) {
+            throw new Error("Permission denied: You don't have access to delete this card.");
+          } else if (errorString.includes("not-found")) {
+            throw new Error("Card not found. It may have already been deleted.");
+          }
+        }
         throw error;
       }
     },
-    onSuccess: () => {
+    onSuccess: (cardId) => {
+      console.log("useCards: DeleteCard mutation successful for card", cardId);
       // Properly invalidate all queries that might be affected
       queryClient.invalidateQueries({ queryKey: ["cards", user?.uid] });
       queryClient.invalidateQueries({ queryKey: ["displayCases", user?.uid] });
@@ -110,11 +132,19 @@ export function useCards() {
     },
   });
 
+  const retryFetchCards = () => {
+    if (error) {
+      toast.info("Retrying to load your cards...");
+      refetch();
+    }
+  };
+
   return {
-    data,
-    isLoading: isLoading || loading,
+    data: data || [],
+    isLoading: cardsLoading || authLoading || isFetching,
     error,
     addCard: addCardMutation.mutate,
     deleteCard: deleteCardMutation.mutate,
+    retryFetchCards
   };
 } 

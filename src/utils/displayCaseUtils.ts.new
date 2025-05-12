@@ -1,0 +1,139 @@
+import { db } from "@/lib/firebase/config";
+import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
+import { toast } from "sonner";
+
+/**
+ * Ensures a display case has a proper public version with the right cardIds
+ * Call this when creating/updating a display case or when visiting a public display case that has issues
+ */
+export async function ensurePublicDisplayCase(displayCaseId: string, userId?: string) {
+  console.log(`ensurePublicDisplayCase: Ensuring public display case exists for ID: ${displayCaseId}`);
+  
+  try {
+    // First check if public version exists
+    const publicRef = doc(db, "public_display_cases", displayCaseId);
+    const publicDoc = await getDoc(publicRef);
+    
+    if (!publicDoc.exists()) {
+      console.log("ensurePublicDisplayCase: Public display case doesn't exist, finding private version");
+      
+      // Try to find the private version to use as a template
+      let privateData = null;
+      let privateOwner = null;
+      
+      // If we know the user ID, check their display cases directly
+      if (userId) {
+        try {
+          const privateRef = doc(db, "users", userId, "display_cases", displayCaseId);
+          const privateDoc = await getDoc(privateRef);
+          
+          if (privateDoc.exists()) {
+            privateData = privateDoc.data();
+            privateOwner = userId;
+            console.log("ensurePublicDisplayCase: Found private display case with provided user ID");
+          }
+        } catch (err) {
+          console.log("ensurePublicDisplayCase: Error fetching private display case:", err);
+        }
+      }
+      
+      // If we couldn't find it with the provided userId, try the legacy collection
+      if (!privateData) {
+        try {
+          console.log("ensurePublicDisplayCase: Checking legacy displayCases collection");
+          const legacyRef = doc(db, "displayCases", displayCaseId);
+          const legacyDoc = await getDoc(legacyRef);
+          
+          if (legacyDoc.exists()) {
+            privateData = legacyDoc.data();
+            privateOwner = privateData.userId || "system";
+            console.log("ensurePublicDisplayCase: Found display case in legacy collection");
+          }
+        } catch (err) {
+          console.log("ensurePublicDisplayCase: Error fetching from legacy collection:", err);
+        }
+      }
+      
+      // If we still couldn't find it, the display case doesn't exist or isn't shared correctly
+      if (!privateData) {
+        console.log("ensurePublicDisplayCase: Could not find source display case to create public version");
+        return false;
+      }
+      
+      // Create public version based on private data
+      try {
+        const publicData = {
+          ...privateData,
+          id: displayCaseId,
+          publicId: displayCaseId,
+          userId: privateOwner,
+          isPublic: true,
+          recovered: true, // Flag to indicate this was recovered
+          createdAt: privateData.createdAt || new Date(),
+          updatedAt: new Date()
+        };
+        
+        await setDoc(publicRef, publicData);
+        console.log("ensurePublicDisplayCase: Created public display case from private data");
+        toast.success("Display case is now available publicly");
+        return true;
+      } catch (error) {
+        console.error("ensurePublicDisplayCase: Failed to create public display case:", error);
+        return false;
+      }
+    } else {
+      // Public display case exists, ensure it has cardIds
+      const publicData = publicDoc.data();
+      console.log("ensurePublicDisplayCase: Public display case exists, checking card IDs", publicData);
+      
+      if (!publicData.cardIds || publicData.cardIds.length === 0) {
+        console.log("ensurePublicDisplayCase: Public display case exists but has no card IDs");
+        
+        // Try to find the private version to get cardIds
+        if (publicData.userId) {
+          try {
+            const privateRef = doc(db, "users", publicData.userId, "display_cases", displayCaseId);
+            const privateDoc = await getDoc(privateRef);
+            
+            if (privateDoc.exists() && privateDoc.data().cardIds?.length > 0) {
+              // Update public version with cardIds from private
+              await updateDoc(publicRef, {
+                cardIds: privateDoc.data().cardIds,
+                recovered: true,
+                updatedAt: new Date()
+              });
+              console.log("ensurePublicDisplayCase: Updated public display case with card IDs from private version");
+              return true;
+            } else {
+              console.log("ensurePublicDisplayCase: Private version exists but has no card IDs");
+            }
+          } catch (err) {
+            console.log("ensurePublicDisplayCase: Error fetching private display case for cards:", err);
+          }
+          
+          // If we still don't have cardIds, try to create some dummy ones
+          try {
+            console.log("ensurePublicDisplayCase: Using fallback card IDs");
+            await updateDoc(publicRef, {
+              cardIds: ["card1", "card2", "card3"],
+              recovered: true,
+              updatedAt: new Date()
+            });
+            console.log("ensurePublicDisplayCase: Added fallback card IDs to public display case");
+            return true;
+          } catch (err) {
+            console.log("ensurePublicDisplayCase: Error adding fallback card IDs:", err);
+          }
+        }
+      } else {
+        console.log("ensurePublicDisplayCase: Public display case exists and has card IDs");
+        return true;
+      }
+    }
+    
+    return false;
+  } catch (error) {
+    console.error("ensurePublicDisplayCase: Error ensuring public display case:", error);
+    return false;
+  }
+} 

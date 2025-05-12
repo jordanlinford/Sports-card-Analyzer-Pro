@@ -1,5 +1,5 @@
 import { db } from "@/lib/firebase/config";
-import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { toast } from "sonner";
 
 /**
@@ -252,42 +252,87 @@ export async function publishDisplayCase(userId: string, displayCaseId: string) 
     const privateDoc = await getDoc(privateRef);
     
     if (!privateDoc.exists()) {
-      console.error("Cannot publish: private display case not found");
+      console.error(`Private display case ${displayCaseId} not found`);
       return false;
     }
     
     const privateData = privateDoc.data();
     
-    // Create/update public version
+    // Create public version
     const publicRef = doc(db, "public_display_cases", displayCaseId);
     
-    // Copy key fields to public version
     await setDoc(publicRef, {
+      ...privateData,
       id: displayCaseId,
       publicId: displayCaseId,
       userId: userId,
-      name: privateData.name || "Untitled Display Case",
-      description: privateData.description || "",
-      background: privateData.background || "default",
-      cardIds: privateData.cardIds || [],
       isPublic: true,
       createdAt: privateData.createdAt || new Date(),
-      updatedAt: new Date(),
-      likes: privateData.likes || 0,
-      comments: privateData.comments || []
-    });
-    
-    // Update private version to mark as public
-    await updateDoc(privateRef, {
-      isPublic: true,
-      publicId: displayCaseId,
       updatedAt: new Date()
     });
     
-    console.log("Display case published successfully");
+    // Update the private version's isPublic flag
+    await updateDoc(privateRef, {
+      isPublic: true,
+      updatedAt: new Date()
+    });
+    
+    console.log(`Successfully published display case ${displayCaseId}`);
     return true;
   } catch (error) {
     console.error("Error publishing display case:", error);
+    return false;
+  }
+}
+
+/**
+ * Helper function to update the likes count in the display case document
+ * This should be called by a Firebase function, not by client code directly
+ */
+export async function updateLikesCount(displayCaseId: string) {
+  if (!displayCaseId) return false;
+  
+  try {
+    // Count the likes in the likes collection
+    const likesQuery = query(
+      collection(db, 'likes'),
+      where('displayCaseId', '==', displayCaseId)
+    );
+    
+    const likesSnapshot = await getDocs(likesQuery);
+    const likesCount = likesSnapshot.size;
+    
+    // Find the display case document
+    const publicRef = doc(db, 'public_display_cases', displayCaseId);
+    const publicDoc = await getDoc(publicRef);
+    
+    if (publicDoc.exists()) {
+      // Update the likes count in the display case document
+      await updateDoc(publicRef, {
+        likes: likesCount,
+        updatedAt: new Date()
+      });
+      console.log(`Updated likes count for display case ${displayCaseId} to ${likesCount}`);
+      return true;
+    } else {
+      // Try legacy collection
+      const legacyRef = doc(db, 'displayCases', displayCaseId);
+      const legacyDoc = await getDoc(legacyRef);
+      
+      if (legacyDoc.exists()) {
+        await updateDoc(legacyRef, {
+          likes: likesCount,
+          updatedAt: new Date()
+        });
+        console.log(`Updated likes count for legacy display case ${displayCaseId} to ${likesCount}`);
+        return true;
+      } else {
+        console.log(`Display case ${displayCaseId} not found in any collection`);
+        return false;
+      }
+    }
+  } catch (error) {
+    console.error(`Error updating likes count for display case ${displayCaseId}:`, error);
     return false;
   }
 } 

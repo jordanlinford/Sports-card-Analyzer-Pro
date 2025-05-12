@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import { User, getAuth, onAuthStateChanged, signOut, signInWithPopup, GoogleAuthProvider } from "firebase/auth";
+import { User, getAuth, onAuthStateChanged, signOut, signInWithPopup, GoogleAuthProvider, updateProfile as fbUpdateProfile, updateEmail as fbUpdateEmail } from "firebase/auth";
 import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase/config";
 import { toast } from "sonner";
@@ -10,6 +10,8 @@ interface AuthContextType {
   loading: boolean;
   logout: () => Promise<void>;
   signInWithGoogle: () => Promise<void>;
+  updateProfile: (profile: { displayName?: string; photoURL?: string }) => Promise<void>;
+  updateEmail: (email: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -17,6 +19,8 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   logout: async () => {},
   signInWithGoogle: async () => {},
+  updateProfile: async () => {},
+  updateEmail: async () => {},
 });
 
 // Helper function to create user document if it doesn't exist
@@ -97,8 +101,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const updateProfile = async (profile: { displayName?: string; photoURL?: string }) => {
+    if (!auth.currentUser) throw new Error("No user");
+    await fbUpdateProfile(auth.currentUser, profile);
+    // Optionally update Firestore user doc
+    const userRef = doc(db, "users", auth.currentUser.uid);
+    await setDoc(userRef, { displayName: profile.displayName }, { merge: true });
+    setUser({ ...auth.currentUser });
+  };
+
+  const updateEmail = async (email: string) => {
+    if (!auth.currentUser) throw new Error("No user");
+    await fbUpdateEmail(auth.currentUser, email);
+    // Optionally update Firestore user doc
+    const userRef = doc(db, "users", auth.currentUser.uid);
+    await setDoc(userRef, { email }, { merge: true });
+    setUser({ ...auth.currentUser });
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, logout, signInWithGoogle }}>
+    <AuthContext.Provider value={{ user, loading, logout, signInWithGoogle, updateProfile, updateEmail }}>
       {children}
     </AuthContext.Provider>
   );

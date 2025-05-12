@@ -3,20 +3,20 @@ import { Card } from '../services/CardService';
 import { cardService } from '../services/CardService';
 import { CardGridView } from '../components/CardGridView';
 import { AddCardModal } from '../components/AddCardModal';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '@/context/AuthContext';
 
 const CollectionManager = () => {
-  const { currentUser } = useAuth();
+  const { user } = useAuth();
   const [cards, setCards] = useState<Card[]>([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
   const fetchCards = async () => {
-    if (!currentUser) return;
+    if (!user) return;
     
     try {
-      const fetchedCards = await cardService.getCards(currentUser.uid);
+      const fetchedCards = await cardService.getCards(user.uid);
       setCards(fetchedCards);
     } catch (err) {
       setError('Failed to fetch cards');
@@ -27,7 +27,7 @@ const CollectionManager = () => {
 
   useEffect(() => {
     fetchCards();
-  }, [currentUser]);
+  }, [user]);
 
   const handleCardAdded = () => {
     fetchCards();
@@ -41,7 +41,7 @@ const CollectionManager = () => {
     fetchCards();
   };
 
-  if (!currentUser) {
+  if (!user) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-red-500">Please log in to view your collection</div>
