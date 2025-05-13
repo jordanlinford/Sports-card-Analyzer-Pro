@@ -65,4 +65,20 @@ export async function getDisplayCase(userId: string, displayCaseId: string): Pro
     id: docSnap.id,
     ...docSnap.data(),
   } as DisplayCase;
+}
+
+export async function likeDisplayCase(userId: string, displayCaseId: string): Promise<void> {
+  const displayCaseRef = doc(db, "users", userId, "display_cases", displayCaseId);
+  await updateDoc(displayCaseRef, {
+    likes: (await getDoc(displayCaseRef)).data()?.likes ? (await getDoc(displayCaseRef)).data()?.likes + 1 : 1,
+  });
+}
+
+export async function commentOnDisplayCase(userId: string, displayCaseId: string, comment: { user: string; text: string; createdAt: any }): Promise<void> {
+  const displayCaseRef = doc(db, "users", userId, "display_cases", displayCaseId);
+  const docSnap = await getDoc(displayCaseRef);
+  const prevComments = docSnap.data()?.comments || [];
+  await updateDoc(displayCaseRef, {
+    comments: [...prevComments, comment],
+  });
 } 

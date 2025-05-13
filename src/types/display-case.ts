@@ -1,5 +1,11 @@
 import { Timestamp } from "firebase/firestore";
 
+export interface DisplayCaseComment {
+  user: string; // userId
+  text: string;
+  createdAt: any; // Firestore Timestamp
+}
+
 export interface DisplayCase {
   id: string;
   name: string;
@@ -10,6 +16,8 @@ export interface DisplayCase {
   isPublic: boolean;
   createdAt: any; // Firestore Timestamp
   description?: string;
+  likes?: number;
+  comments?: DisplayCaseComment[];
 }
 
 export interface CreateDisplayCaseData {

@@ -204,14 +204,14 @@ function DashboardCard({
   hasError?: boolean;
 }) {
   return (
-    <div className="bg-white shadow rounded-lg p-4 border border-gray-200">
-      <div className="flex items-center justify-between">
-        <h2 className="text-sm font-medium text-gray-500">{title}</h2>
-        {icon && <span className="text-xl">{icon}</span>}
+    <div className="bg-white dark:bg-background-dark rounded-2xl shadow-lg p-6 flex flex-col items-start gap-2 border border-gray-100 dark:border-gray-800 hover:shadow-xl transition-shadow group cursor-pointer">
+      <div className="flex items-center gap-3 mb-2">
+        {icon && <span className="text-3xl md:text-4xl text-primary dark:text-secondary drop-shadow font-heading">{icon}</span>}
+        <h2 className="font-heading text-lg md:text-xl text-primary dark:text-secondary uppercase tracking-wide">{title}</h2>
       </div>
       {isLoading ? (
         <div className="mt-2 flex items-center">
-          <Loader2 className="h-5 w-5 animate-spin text-blue-500 mr-2" />
+          <Loader2 className="h-5 w-5 animate-spin text-primary dark:text-secondary mr-2" />
           <span className="text-gray-500">Loading...</span>
         </div>
       ) : hasError ? (
@@ -219,7 +219,7 @@ function DashboardCard({
           <span className="text-red-500">Error loading data</span>
         </div>
       ) : (
-      <p className={`mt-2 text-2xl font-bold ${valueColor}`}>{value}</p>
+        <p className={`mt-2 text-3xl md:text-4xl font-mono font-bold ${valueColor} group-hover:text-accent transition-colors`}>{value}</p>
       )}
     </div>
   );

@@ -295,7 +295,6 @@ export default function MarketAnalyzerPage() {
   const [grading, setGrading] = useState("any");
   const [isLoading, setIsLoading] = useState(false);
   const [isSearched, setIsSearched] = useState(false);
-  const [useTestData, setUseTestData] = useState(true);
   
   // Add search query state for the new single search field
   const [searchQuery, setSearchQuery] = useState("");
@@ -733,21 +732,14 @@ export default function MarketAnalyzerPage() {
         grade: selectedCard.grade,
       };
       
-      if (useTestData) {
-        const mockListings = generateMockListings(targetCard);
-        const groupedListings = groupVariationSales(mockListings, targetCard);
+      // For real data, we just need to filter the existing listings by date
+      if (originalListings.current.length > 0) {
+        const groupedListings = groupVariationSales(originalListings.current, targetCard);
         const chartData = generatePriceDataFromListings(groupedListings);
         setPriceData(chartData);
-      } else {
-        // For real data, we just need to filter the existing listings by date
-        if (originalListings.current.length > 0) {
-          const groupedListings = groupVariationSales(originalListings.current, targetCard);
-          const chartData = generatePriceDataFromListings(groupedListings);
-          setPriceData(chartData);
-        }
       }
     }
-  }, [timeRange, isSearched, selectedCard, marketMetrics, useTestData]);
+  }, [timeRange, isSearched, selectedCard, marketMetrics]);
 
   // Update the chart render condition to force display even with problematic data
   useEffect(() => {
@@ -848,79 +840,72 @@ export default function MarketAnalyzerPage() {
     };
     
     try {
-      if (useTestData) {
-        // Generate mock data
-        console.log("Using test data");
-        const mockListings = generateMockListings(targetCard);
-        processScrapedListings(mockListings, targetCard);
-      } else {
-        // Call the eBay scraper API
-        let requestPayload;
+      // Call the eBay scraper API
+      let requestPayload;
+      
+      if (searchQuery) {
+        // If using the free text search, send query parameter
+        // Also include playerName for backward compatibility with the server
+        const playerNameGuess = searchQuery.trim().split(' ').slice(0, 2).join(' ');
         
-        if (searchQuery) {
-          // If using the free text search, send query parameter
-          // Also include playerName for backward compatibility with the server
-          const playerNameGuess = searchQuery.trim().split(' ').slice(0, 2).join(' ');
-          
-          requestPayload = {
-            query: searchQuery.trim(),
-            playerName: playerNameGuess, // Add for backward compatibility
-            grade: grading !== 'any' ? grading : undefined,
-            condition: grading !== 'any' ? grading : undefined,
-            negKeywords: ['lot', 'reprint', 'digital', 'case', 'break']
-          };
-          
-          console.log("Using free text search with query:", searchQuery);
-        } else {
-          // Using structured search fields
-          requestPayload = {
-            playerName,
-            year: cardYear,
-            cardSet,
-            cardNumber,
-            variation: cardVariation,
-            grade: grading !== 'any' ? grading : undefined,
-            condition: grading !== 'any' ? grading : undefined,
-            negKeywords: ['lot', 'reprint', 'digital', 'case', 'break']
-          };
-          
-          console.log("Using structured search with fields:", requestPayload);
-        }
-        
-        console.log("Request payload:", requestPayload);
-        
-        // Use the full URL with port to ensure proper connection
-        const response = await axios.post('http://localhost:3001/api/scrape', requestPayload);
-        
-        console.log("Received scraper response:", response.data);
-        
-        // Type assertion to handle TypeScript error
-        const responseData = response.data as { 
-          listings: ScrapedListing[], 
-          count: number,
-          query: string,
-          isSynthetic?: boolean
+        requestPayload = {
+          query: searchQuery.trim(),
+          playerName: playerNameGuess, // Add for backward compatibility
+          grade: grading !== 'any' ? grading : undefined,
+          condition: grading !== 'any' ? grading : undefined,
+          negKeywords: ['lot', 'reprint', 'digital', 'case', 'break']
         };
         
-        if (responseData && responseData.listings && responseData.listings.length > 0) {
-          console.log(`Processing ${responseData.listings.length} listings from eBay`);
-          
-          // Check if the data is synthetic
-          if (responseData.isSynthetic) {
-            console.log("Data is synthetic/estimated - will display with warning");
-            setSearchError("Limited sales data available. Showing estimated values.");
-          }
-          
-          processScrapedListings(responseData.listings, targetCard);
-        } else {
-          // Handle empty response
-          console.log("No listings found for the search criteria.");
-          setResults([]);
-          setIsLoading(false);
-          setIsSearched(true); // Make sure we set isSearched to true even if there are no results
-          setAnalysisStep('search');
-          setSearchError("No listings found for your search criteria. Try broadening your search.");
+        console.log("Using free text search with query:", searchQuery);
+      } else {
+        // Using structured search fields
+        requestPayload = {
+          playerName,
+          year: cardYear,
+          cardSet,
+          cardNumber,
+          variation: cardVariation,
+          grade: grading !== 'any' ? grading : undefined,
+          condition: grading !== 'any' ? grading : undefined,
+          negKeywords: ['lot', 'reprint', 'digital', 'case', 'break']
+        };
+        
+        console.log("Using structured search with fields:", requestPayload);
+      }
+      
+      console.log("Request payload:", requestPayload);
+      
+      // Use the full URL with port to ensure proper connection
+      const response = await axios.post('http://localhost:3001/api/scrape', requestPayload);
+      
+      console.log("Received scraper response:", response.data);
+      
+      // Type assertion to handle TypeScript error
+      const responseData = response.data as { 
+        listings: ScrapedListing[], 
+        count: number,
+        query: string,
+        isSynthetic?: boolean
+      };
+      
+      if (responseData && responseData.listings && responseData.listings.length > 0) {
+        console.log(`Processing ${responseData.listings.length} listings from eBay`);
+        
+        // Check if the data is synthetic
+        if (responseData.isSynthetic) {
+          console.log("Data is synthetic/estimated - will display with warning");
+          setSearchError("Limited sales data available. Showing estimated values.");
         }
+        
+        processScrapedListings(responseData.listings, targetCard);
+      } else {
+        // Handle empty response
+        console.log("No listings found for the search criteria.");
+        setResults([]);
+        setIsLoading(false);
+        setIsSearched(true); // Make sure we set isSearched to true even if there are no results
+        setAnalysisStep('search');
+        setSearchError("No listings found for your search criteria. Try broadening your search.");
       }
     } catch (error) {
       console.error('Error fetching card data:', error);
@@ -1644,15 +1629,6 @@ export default function MarketAnalyzerPage() {
                 Optional: Filter by card condition or grading.
                 Including it in your search query also works.
               </p>
-            </div>
-            
-            <div className="flex items-center space-x-2">
-              <Checkbox 
-                id="useTestData" 
-                checked={useTestData} 
-                onCheckedChange={(checked) => setUseTestData(checked as boolean)} 
-              />
-              <Label htmlFor="useTestData">Use test data instead of real eBay data</Label>
             </div>
             
             <Button type="submit" disabled={isLoading}>

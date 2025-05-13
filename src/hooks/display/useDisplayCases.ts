@@ -3,7 +3,7 @@ import { collection, query, where, getDocs, deleteDoc, doc, updateDoc } from "fi
 import { db } from "@/lib/firebase/config";
 import { DisplayCase } from "@/types/display-case";
 import { useAuth } from "@/context/AuthContext";
-import { createDisplayCase as createDisplayCaseFn } from "@/lib/firebase/display-cases";
+import { createDisplayCase as createDisplayCaseFn, likeDisplayCase as likeDisplayCaseFn, commentOnDisplayCase as commentOnDisplayCaseFn } from "@/lib/firebase/display-cases";
 
 export function useDisplayCases() {
   const { user } = useAuth();
@@ -59,6 +59,28 @@ export function useDisplayCases() {
     },
   });
 
+  // Like Display Case mutation
+  const likeMutation = useMutation({
+    mutationFn: async (displayCaseId: string) => {
+      if (!user) throw new Error('User must be authenticated to like a display case');
+      await likeDisplayCaseFn(user.uid, displayCaseId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey });
+    },
+  });
+
+  // Comment on Display Case mutation
+  const commentMutation = useMutation({
+    mutationFn: async ({ displayCaseId, comment }: { displayCaseId: string; comment: { user: string; text: string; createdAt: any } }) => {
+      if (!user) throw new Error('User must be authenticated to comment on a display case');
+      await commentOnDisplayCaseFn(user.uid, displayCaseId, comment);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey });
+    },
+  });
+
   return {
     displayCases,
     isLoading,
@@ -69,5 +91,7 @@ export function useDisplayCases() {
     isCreating: createMutation.isPending,
     isUpdating: updateMutation.isPending,
     refetch,
+    likeDisplayCase: likeMutation.mutate,
+    commentOnDisplayCase: (displayCaseId: string, comment: { user: string; text: string; createdAt: any }) => commentMutation.mutate({ displayCaseId, comment }),
   };
 } 

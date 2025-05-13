@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from "@/context/AuthContext";
 import { Toaster } from 'sonner';
+import { SubscriptionBadge } from '@/components/SubscriptionBadge';
 
 interface LayoutProps {
   children: React.ReactNode;
