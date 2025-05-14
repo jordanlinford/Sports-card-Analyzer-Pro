@@ -3,6 +3,9 @@ import { Card, CardService } from '../services/CardService';
 import { uploadImage } from '../utils/imageUpload';
 import { useAuth } from '@/context/AuthContext';
 import { EmergencyDeleteButton } from './EmergencyDeleteButton';
+import { syncCardWithDisplayCases } from '@/lib/firebase/cards';
+import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 
 interface EditCardModalProps {
   card: Card;
@@ -17,6 +20,8 @@ export const EditCardModal = ({ card, isOpen, onClose, onCardUpdated, onCardDele
   const [editedCard, setEditedCard] = useState<Card>(card);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [tagsInput, setTagsInput] = useState<string>(card.tags?.join(', ') || '');
+  const queryClient = useQueryClient();
 
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -41,6 +46,19 @@ export const EditCardModal = ({ card, isOpen, onClose, onCardUpdated, onCardDele
     setError(null);
 
     try {
+      const parsedTags = tagsInput
+        .split(',')
+        .map(tag => tag.trim())
+        .filter(Boolean);
+
+      const formattedPricePaid = editedCard.pricePaid !== undefined 
+        ? parseFloat(editedCard.pricePaid.toFixed(2)) 
+        : undefined;
+        
+      const formattedCurrentValue = editedCard.currentValue !== undefined 
+        ? parseFloat(editedCard.currentValue.toFixed(2)) 
+        : undefined;
+
       const updateData = {
         playerName: editedCard.playerName,
         year: editedCard.year,
@@ -49,12 +67,41 @@ export const EditCardModal = ({ card, isOpen, onClose, onCardUpdated, onCardDele
         cardNumber: editedCard.cardNumber,
         condition: editedCard.condition,
         imageUrl: editedCard.imageUrl,
+        tags: parsedTags,
+        pricePaid: formattedPricePaid,
+        currentValue: formattedCurrentValue
       };
 
-      await CardService.updateCard(user.uid, editedCard.id, updateData);
+      console.log("Updating card with tags:", parsedTags);
+      const updatedCard = await CardService.updateCard(user.uid, editedCard.id, updateData);
+      
+      const tagsChanged = JSON.stringify(card.tags) !== JSON.stringify(parsedTags);
+      
+      if (parsedTags.length > 0 && tagsChanged) {
+        try {
+          console.log("Syncing updated card with display cases...");
+          const syncResult = await syncCardWithDisplayCases(
+            { ...updatedCard, tags: parsedTags },
+            user.uid
+          );
+          
+          if (syncResult.syncedCount > 0) {
+            toast.success(`Card was added to ${syncResult.syncedCount} display case(s) with matching tags`);
+          }
+          
+          queryClient.invalidateQueries({ queryKey: ["displayCases", user.uid] });
+          
+        } catch (syncError) {
+          console.error("Error syncing card with display cases:", syncError);
+        }
+      }
+      
+      queryClient.invalidateQueries({ queryKey: ["cards", user.uid] });
+      
       onCardUpdated();
       onClose();
     } catch (error) {
+      console.error("Error updating card:", error);
       setError('Failed to update card');
     } finally {
       setIsLoading(false);
@@ -128,19 +175,15 @@ export const EditCardModal = ({ card, isOpen, onClose, onCardUpdated, onCardDele
 
           <div>
             <label htmlFor="condition" className="block text-sm font-medium text-gray-700">Condition</label>
-            <select
+            <input
               id="condition"
+              type="text"
               value={editedCard.condition}
               onChange={(e) => setEditedCard(prev => ({ ...prev, condition: e.target.value }))}
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+              placeholder="Enter grading company and grade (e.g., PSA 9, BGS 9.5) or 'Raw'"
               required
-            >
-              <option value="Mint">Mint</option>
-              <option value="Near Mint">Near Mint</option>
-              <option value="Excellent">Excellent</option>
-              <option value="Good">Good</option>
-              <option value="Poor">Poor</option>
-            </select>
+            />
           </div>
 
           <div>
@@ -148,8 +191,14 @@ export const EditCardModal = ({ card, isOpen, onClose, onCardUpdated, onCardDele
             <input
               id="pricePaid"
               type="number"
-              value={editedCard.pricePaid}
-              onChange={(e) => setEditedCard(prev => ({ ...prev, pricePaid: parseFloat(e.target.value) }))}
+              value={editedCard.pricePaid !== undefined ? editedCard.pricePaid.toFixed(2) : ''}
+              onChange={(e) => {
+                const value = parseFloat(e.target.value);
+                setEditedCard(prev => ({
+                  ...prev,
+                  pricePaid: isNaN(value) ? 0 : value
+                }));
+              }}
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
               required
               min="0"
@@ -162,8 +211,14 @@ export const EditCardModal = ({ card, isOpen, onClose, onCardUpdated, onCardDele
             <input
               id="currentValue"
               type="number"
-              value={editedCard.currentValue}
-              onChange={(e) => setEditedCard(prev => ({ ...prev, currentValue: parseFloat(e.target.value) }))}
+              value={editedCard.currentValue !== undefined ? editedCard.currentValue.toFixed(2) : ''}
+              onChange={(e) => {
+                const value = parseFloat(e.target.value);
+                setEditedCard(prev => ({
+                  ...prev,
+                  currentValue: isNaN(value) ? 0 : value
+                }));
+              }}
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
               required
               min="0"
@@ -176,13 +231,26 @@ export const EditCardModal = ({ card, isOpen, onClose, onCardUpdated, onCardDele
             <input
               id="tags"
               type="text"
-              value={editedCard.tags?.join(', ') || ''}
-              onChange={(e) => setEditedCard({ 
-                ...editedCard, 
-                tags: e.target.value.split(',').map(tag => tag.trim()).filter(Boolean)
-              })}
+              value={tagsInput}
+              onChange={(e) => {
+                setTagsInput(e.target.value);
+                
+                const parsedTags = e.target.value
+                  .split(',')
+                  .map(tag => tag.trim())
+                  .filter(Boolean);
+                
+                setEditedCard(prev => ({
+                  ...prev,
+                  tags: parsedTags
+                }));
+              }}
+              placeholder="e.g. Rookie, Holo, Lakers"
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
             />
+            <p className="text-xs text-gray-500 mt-1">
+              Separate multiple tags with commas (e.g., "Rookie, Holo, Lakers")
+            </p>
           </div>
 
           <div>

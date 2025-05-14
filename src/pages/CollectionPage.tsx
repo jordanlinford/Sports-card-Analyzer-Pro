@@ -109,8 +109,15 @@ const CollectionPage: React.FC = () => {
         cardSet: card.cardSet,
         cardNumber: card.cardNumber,
         variation: card.variation,
-        grade: card.condition === 'Raw' ? 'raw' : card.condition
+        grade: getFormattedGrade(card.condition)
       };
+
+      // Log the exact search parameters for debugging
+      console.log("Search parameters being sent to eBay scraper:", searchParams);
+      
+      // Create a more accurate search string that includes ALL card details
+      const fullSearchString = `${card.year} ${card.playerName} ${card.cardSet} ${card.variation || ''} ${card.cardNumber} ${card.condition}`.trim();
+      console.log("Full search string that would be used manually:", fullSearchString);
 
       // Call the scraper API to get latest sales data
       interface ScrapeResponse {
@@ -126,8 +133,15 @@ const CollectionPage: React.FC = () => {
       console.log(`Fetching data for: ${card.playerName} ${card.year} ${card.cardSet}`);
       
       try {
+        // Add the fullSearchString to the parameters
+        const enhancedParams = {
+          ...searchParams,
+          fullSearchString: fullSearchString, // Add this for more accurate searching
+          useFullSearch: true // Tell the scraper to prioritize the full search string
+        };
+
         // Use the absolute URL with the correct port instead of a relative URL
-        const response = await axios.post<ScrapeResponse>('http://localhost:3001/api/scrape', searchParams);
+        const response = await axios.post<ScrapeResponse>('http://localhost:3001/api/scrape', enhancedParams);
         
         console.log(`Response for ${card.playerName}: success=${response.data.success}, listings=${response.data.listings?.length || 0}`);
         
@@ -244,8 +258,15 @@ const CollectionPage: React.FC = () => {
               cardSet: card.cardSet,
               cardNumber: card.cardNumber,
               variation: card.variation,
-              grade: card.condition === 'Raw' ? 'raw' : card.condition
+              grade: getFormattedGrade(card.condition)
             };
+
+            // Log the exact search parameters for debugging
+            console.log("Search parameters being sent to eBay scraper:", searchParams);
+            
+            // Create a more accurate search string that includes ALL card details
+            const fullSearchString = `${card.year} ${card.playerName} ${card.cardSet} ${card.variation || ''} ${card.cardNumber} ${card.condition}`.trim();
+            console.log("Full search string that would be used manually:", fullSearchString);
 
             // Call the scraper API to get latest sales data
             interface ScrapeResponse {
@@ -261,8 +282,15 @@ const CollectionPage: React.FC = () => {
             console.log(`Fetching data for: ${card.playerName} ${card.year} ${card.cardSet}`);
             
             try {
+              // Add the fullSearchString to the parameters
+              const enhancedParams = {
+                ...searchParams,
+                fullSearchString: fullSearchString, // Add this for more accurate searching
+                useFullSearch: true // Tell the scraper to prioritize the full search string
+              };
+
               // Use the absolute URL with the correct port instead of a relative URL
-              const response = await axios.post<ScrapeResponse>('http://localhost:3001/api/scrape', searchParams);
+              const response = await axios.post<ScrapeResponse>('http://localhost:3001/api/scrape', enhancedParams);
               
               console.log(`Response for ${card.playerName}: success=${response.data.success}, listings=${response.data.listings?.length || 0}`);
               
@@ -344,6 +372,24 @@ const CollectionPage: React.FC = () => {
     } finally {
       setIsUpdatingValues(false);
     }
+  };
+
+  // Add this helper function at the top of the CollectionPage component, right after the useState declarations
+  const getFormattedGrade = (condition: string | undefined): string => {
+    if (!condition) return 'raw';
+    
+    // Handle "Raw" condition
+    if (condition.toLowerCase() === 'raw') return 'raw';
+    
+    // Handle PSA, BGS, SGC formats
+    if (condition.toLowerCase().includes('psa') || 
+        condition.toLowerCase().includes('bgs') || 
+        condition.toLowerCase().includes('sgc')) {
+      return condition; // Return full grading info for standard graded cards
+    }
+    
+    // Otherwise, just return the condition as-is
+    return condition;
   };
 
   if (isLoading) {

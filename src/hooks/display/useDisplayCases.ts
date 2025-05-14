@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { collection, query, where, getDocs, deleteDoc, doc, updateDoc } from "firebase/firestore";
+import { collection, query, where, getDocs, deleteDoc, doc, getDoc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase/config";
 import { DisplayCase } from "@/types/display-case";
 import { useAuth } from "@/context/AuthContext";
@@ -14,14 +14,48 @@ export function useDisplayCases() {
     queryKey,
     queryFn: async () => {
       if (!user) return [];
+      
+      console.log("Fetching display cases for user:", user.uid);
+      
+      // Get display cases from user's collection
       const displayCasesRef = collection(db, "users", user.uid, "display_cases");
       const querySnapshot = await getDocs(displayCasesRef);
-      return querySnapshot.docs.map(doc => ({
-        ...doc.data(),
-        id: doc.id,
-      })) as DisplayCase[];
+      
+      const cases = await Promise.all(querySnapshot.docs.map(async (docSnapshot) => {
+        const displayCase = {
+          ...docSnapshot.data(),
+          id: docSnapshot.id,
+        } as DisplayCase;
+        
+        // Also check for public version to get the most up-to-date stats
+        try {
+          const publicRef = doc(db, "public_display_cases", docSnapshot.id);
+          const publicSnapshot = await getDoc(publicRef);
+          
+          if (publicSnapshot.exists()) {
+            const publicData = publicSnapshot.data();
+            
+            // Use the public stats if they exist
+            return {
+              ...displayCase,
+              likes: publicData.likes || displayCase.likes || 0,
+              comments: publicData.comments || displayCase.comments || [],
+              visits: publicData.visits || displayCase.visits || 0
+            } as DisplayCase;
+          }
+        } catch (error) {
+          console.error("Error fetching public display case:", error);
+        }
+        
+        return displayCase;
+      }));
+      
+      console.log("Fetched display cases:", cases.length);
+      return cases;
     },
     enabled: !!user,
+    staleTime: 30 * 1000, // Consider data stale after 30 seconds
+    refetchOnWindowFocus: true, // Refresh when window regains focus
   });
 
   const deleteMutation = useMutation({

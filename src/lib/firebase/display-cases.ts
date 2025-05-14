@@ -1,4 +1,4 @@
-import { collection, addDoc, getDocs, query, where, orderBy, doc, getDoc, updateDoc } from "firebase/firestore";
+import { collection, addDoc, getDocs, query, where, orderBy, doc, getDoc, updateDoc, increment } from "firebase/firestore";
 import { db } from "./config";
 import { DisplayCase, CreateDisplayCaseData } from "@/types/display-case";
 import { getAuth } from "firebase/auth";
@@ -69,16 +69,86 @@ export async function getDisplayCase(userId: string, displayCaseId: string): Pro
 
 export async function likeDisplayCase(userId: string, displayCaseId: string): Promise<void> {
   const displayCaseRef = doc(db, "users", userId, "display_cases", displayCaseId);
+  
+  // Use Firestore's increment operation to atomically update the likes count
   await updateDoc(displayCaseRef, {
-    likes: (await getDoc(displayCaseRef)).data()?.likes ? (await getDoc(displayCaseRef)).data()?.likes + 1 : 1,
+    likes: increment(1),
+    updatedAt: new Date()
   });
+  
+  // Check if a public version exists and update it as well
+  try {
+    const publicDisplayCaseRef = doc(db, "public_display_cases", displayCaseId);
+    const publicDocSnap = await getDoc(publicDisplayCaseRef);
+    
+    if (publicDocSnap.exists()) {
+      await updateDoc(publicDisplayCaseRef, {
+        likes: increment(1),
+        updatedAt: new Date()
+      });
+    }
+  } catch (error) {
+    console.error("Error updating public display case likes:", error);
+  }
 }
 
 export async function commentOnDisplayCase(userId: string, displayCaseId: string, comment: { user: string; text: string; createdAt: any }): Promise<void> {
   const displayCaseRef = doc(db, "users", userId, "display_cases", displayCaseId);
   const docSnap = await getDoc(displayCaseRef);
-  const prevComments = docSnap.data()?.comments || [];
+  
+  // Make sure we have valid data
+  if (!docSnap.exists()) {
+    throw new Error(`Display case with ID ${displayCaseId} not found`);
+  }
+  
+  const displayCaseData = docSnap.data();
+  const prevComments = displayCaseData?.comments || [];
+  
+  // Update the user's display case
   await updateDoc(displayCaseRef, {
     comments: [...prevComments, comment],
+    updatedAt: new Date()
   });
+  
+  // Check if a public version exists and update it as well
+  try {
+    const publicDisplayCaseRef = doc(db, "public_display_cases", displayCaseId);
+    const publicDocSnap = await getDoc(publicDisplayCaseRef);
+    
+    if (publicDocSnap.exists()) {
+      const publicDisplayCaseData = publicDocSnap.data();
+      const publicPrevComments = publicDisplayCaseData?.comments || [];
+      
+      await updateDoc(publicDisplayCaseRef, {
+        comments: [...publicPrevComments, comment],
+        updatedAt: new Date()
+      });
+    }
+  } catch (error) {
+    console.error("Error updating public display case comments:", error);
+  }
+}
+
+export async function incrementDisplayCaseVisit(userId: string, displayCaseId: string): Promise<void> {
+  // Update the private display case
+  const displayCaseRef = doc(db, "users", userId, "display_cases", displayCaseId);
+  await updateDoc(displayCaseRef, {
+    visits: increment(1),
+    updatedAt: new Date()
+  });
+  
+  // Check if a public version exists and update it as well
+  try {
+    const publicDisplayCaseRef = doc(db, "public_display_cases", displayCaseId);
+    const publicDocSnap = await getDoc(publicDisplayCaseRef);
+    
+    if (publicDocSnap.exists()) {
+      await updateDoc(publicDisplayCaseRef, {
+        visits: increment(1),
+        updatedAt: new Date()
+      });
+    }
+  } catch (error) {
+    console.error("Error updating public display case visits:", error);
+  }
 } 

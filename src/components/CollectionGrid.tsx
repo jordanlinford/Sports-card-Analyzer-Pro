@@ -3,7 +3,7 @@ import { Card } from '@/types/Card';
 import { EmergencyDeleteButton } from '@/components/EmergencyDeleteButton';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, ExternalLink } from 'lucide-react';
 
 interface CollectionGridProps {
   cards: Card[];
@@ -34,7 +34,7 @@ const CollectionGrid: React.FC<CollectionGridProps> = ({
   };
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-4 gap-4">
       {cards.map((card) => (
         <div
           key={card.id}
@@ -68,6 +68,24 @@ const CollectionGrid: React.FC<CollectionGridProps> = ({
                 </Button>
               </div>
             )}
+            
+            {/* eBay search button */}
+            <div onClick={(e) => e.stopPropagation()}>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8 bg-white"
+                title="Check on eBay"
+                onClick={() => {
+                  // Create a full search string for eBay
+                  const searchQuery = `${card.year} ${card.playerName} ${card.cardSet} ${card.variation || ''} ${card.cardNumber} ${card.condition || ''}`;
+                  // Open eBay search in a new tab
+                  window.open(`https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(searchQuery)}&_sacat=0&LH_Complete=1&LH_Sold=1`, '_blank');
+                }}
+              >
+                <ExternalLink className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
 
           {card.imageUrl ? (

@@ -1,12 +1,44 @@
 import { DisplayCase } from "@/types/display-case";
 import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
-import { PlaceholderCard } from "@/components/ui/placeholder-card";
-import { useState, useEffect } from "react";
-import { db } from "@/lib/firebase/config";
-import { doc, getDoc } from "firebase/firestore";
-import { useAuth } from "@/context/AuthContext";
-import { Card } from "@/types/Card";
+
+// Simple colored box to represent a card
+const SimpleCardBox = ({ index }: { index: number }) => {
+  // Different color palettes for variety
+  const colorPalettes = [
+    ["#0ea5e9", "#0284c7", "#0369a1"], // Blues
+    ["#dc2626", "#b91c1c", "#991b1b"], // Reds
+    ["#16a34a", "#15803d", "#166534"], // Greens
+    ["#eab308", "#ca8a04", "#a16207"], // Yellows
+    ["#7c3aed", "#6d28d9", "#5b21b6"]  // Purples
+  ];
+  
+  // Select color palette and color based on the index
+  const paletteIndex = index % colorPalettes.length;
+  const colorIndex = Math.floor(Math.random() * 3);
+  const backgroundColor = colorPalettes[paletteIndex][colorIndex];
+  
+  return (
+    <div 
+      style={{
+        width: "80px",
+        height: "120px",
+        backgroundColor,
+        borderRadius: "8px",
+        border: "2px solid #333",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: "white",
+        fontWeight: "bold",
+        fontSize: "14px",
+        boxShadow: "0 2px 4px rgba(0,0,0,0.2)"
+      }}
+    >
+      {index + 1}
+    </div>
+  );
+};
 
 interface DisplayCaseCardProps {
   displayCase: DisplayCase;
@@ -14,66 +46,6 @@ interface DisplayCaseCardProps {
 
 export default function DisplayCaseCard({ displayCase }: DisplayCaseCardProps) {
   const navigate = useNavigate();
-  const [cardImages, setCardImages] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
-  const { user } = useAuth();
-
-  useEffect(() => {
-    async function fetchCardImages() {
-      if (!user?.uid || !displayCase.cardIds?.length) {
-        setLoading(false);
-        return;
-      }
-
-      try {
-        const images: string[] = [];
-        // Only fetch the first 3 cards for preview
-        const cardIdsToFetch = displayCase.cardIds.slice(0, 3);
-
-        for (const cardId of cardIdsToFetch) {
-          let imageUrl = null;
-          
-          // Try cards collection first
-          try {
-            const cardRef = doc(db, "users", user.uid, "cards", cardId);
-            const cardSnapshot = await getDoc(cardRef);
-            
-            if (cardSnapshot.exists() && cardSnapshot.data().imageUrl) {
-              imageUrl = cardSnapshot.data().imageUrl;
-            }
-          } catch (error) {
-            console.log("Error fetching card image from cards collection:", error);
-          }
-          
-          // If not found, try collection path
-          if (!imageUrl) {
-            try {
-              const collectionRef = doc(db, "users", user.uid, "collection", cardId);
-              const collectionSnapshot = await getDoc(collectionRef);
-              
-              if (collectionSnapshot.exists() && collectionSnapshot.data().imageUrl) {
-                imageUrl = collectionSnapshot.data().imageUrl;
-              }
-            } catch (error) {
-              console.log("Error fetching card image from collection:", error);
-            }
-          }
-
-          if (imageUrl) {
-            images.push(imageUrl);
-          }
-        }
-
-        setCardImages(images);
-      } catch (error) {
-        console.error("Error fetching card images:", error);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchCardImages();
-  }, [displayCase.cardIds, user]);
 
   const handleClick = () => {
     navigate(`/display-case/${displayCase.id}`);
@@ -110,40 +82,31 @@ export default function DisplayCaseCard({ displayCase }: DisplayCaseCardProps) {
         </div>
       )}
 
-      {displayCase.cardIds && displayCase.cardIds.length > 0 ? (
+      {/* Display simple colored boxes instead of SVG cards */}
+      <div className="h-32 relative border-t mt-2 pt-2 mb-2">
         <div className="flex gap-2 overflow-x-auto pb-2">
-          {loading ? (
-            // Show placeholders while loading
-            Array(Math.min(3, displayCase.cardIds.length)).fill(0).map((_, i) => (
-              <div key={i} className="relative group">
-                <PlaceholderCard className="h-20 w-auto animate-pulse" />
-              </div>
-            ))
-          ) : (
-            // Show actual card images or placeholders if no images found
-            displayCase.cardIds.slice(0, 3).map((cardId, idx) => (
-              <div key={cardId} className="relative group">
-                {cardImages[idx] ? (
-                  <img 
-                    src={cardImages[idx]} 
-                    alt="Card" 
-                    className="h-20 w-auto object-cover rounded-lg border"
-                  />
-                ) : (
-                  <PlaceholderCard className="h-20 w-auto" />
-                )}
-              </div>
-            ))
-          )}
-          {displayCase.cardIds.length > 3 && (
-            <div className="flex items-center justify-center h-20 w-20 bg-muted rounded-lg border">
-              <span className="text-sm text-muted-foreground">+{displayCase.cardIds.length - 3}</span>
+          {/* Use simple colored boxes for each card */}
+          {Array.from({ length: Math.min(displayCase.cardIds?.length || 3, 3) }).map((_, idx) => (
+            <div key={idx} className="mr-2">
+              <SimpleCardBox index={idx} />
+            </div>
+          ))}
+          
+          {/* Show the +X indicator if more than 3 cards */}
+          {(displayCase.cardIds?.length || 0) > 3 && (
+            <div className="flex items-center justify-center h-24 w-16 bg-muted rounded-lg">
+              <span className="text-sm text-muted-foreground">+{(displayCase.cardIds?.length || 0) - 3}</span>
             </div>
           )}
         </div>
-      ) : (
-        <p className="text-sm text-muted-foreground italic">No cards yet</p>
-      )}
+      </div>
+      
+      {/* Stats display */}
+      <div className="flex items-center space-x-4 mt-4 text-sm text-gray-500">
+        <span title="Likes">❤️ {displayCase.likes || 0}</span>
+        <span title="Comments">💬 {displayCase.comments?.length || 0}</span>
+        <span title="Views">👁️ {displayCase.visits || 0}</span>
+      </div>
     </div>
   );
 } 

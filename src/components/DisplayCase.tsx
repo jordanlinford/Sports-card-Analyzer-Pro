@@ -1,10 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { DisplayCase } from '@/lib/firebase/displayCases';
 import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
 import { formatRelative } from 'date-fns';
 import { useDisplayCases } from '@/hooks/display/useDisplayCases';
 import { useAuth } from "@/context/AuthContext";
+import { db } from "@/lib/firebase/config";
+import { doc, updateDoc, increment, getDoc } from "firebase/firestore";
+import { deleteDisplayCase } from '@/lib/firebase/displayCases';
+import { incrementDisplayCaseVisit } from '@/lib/firebase/display-cases';
 
 interface DisplayCaseProps {
   displayCase: DisplayCase;
@@ -18,9 +22,19 @@ export function DisplayCaseComponent({ displayCase, onEdit }: DisplayCaseProps) 
   const { likeDisplayCase, commentOnDisplayCase } = useDisplayCases();
   const { user } = useAuth();
 
+  useEffect(() => {
+    // Increment visit count when the display case is viewed
+    if (displayCase && displayCase.id) {
+      incrementDisplayCaseVisit(displayCase.userId, displayCase.id)
+        .catch(error => {
+          console.error("Error incrementing display case visit count:", error);
+        });
+    }
+  }, [displayCase?.id, displayCase?.userId]);
+
   const handleDelete = async () => {
     try {
-      await remove(displayCase.id);
+      await deleteDisplayCase(displayCase.id);
       setIsDeleteModalOpen(false);
     } catch (error) {
       console.error('Error deleting display case:', error);
@@ -57,6 +71,11 @@ export function DisplayCaseComponent({ displayCase, onEdit }: DisplayCaseProps) 
         <div>
           <h2 className="text-2xl font-heading font-bold text-primary dark:text-secondary mb-1">{displayCase.name}</h2>
           <p className="text-gray-600 dark:text-gray-300 font-body mt-1">{displayCase.description}</p>
+          <div className="flex items-center space-x-4 mt-2 text-sm text-gray-500">
+            <span>❤️ {displayCase.likes || 0}</span>
+            <span>💬 {displayCase.comments?.length || 0}</span>
+            <span>👁️ {displayCase.visits || 0}</span>
+          </div>
         </div>
         <div className="flex space-x-2">
           <Button variant="outline" onClick={onEdit} className="border-primary text-primary dark:border-secondary dark:text-secondary font-bold hover:bg-primary/10 dark:hover:bg-secondary/10 transition-colors">
@@ -84,8 +103,9 @@ export function DisplayCaseComponent({ displayCase, onEdit }: DisplayCaseProps) 
             {displayCase.likes || 0}
           </Button>
           <Button variant="ghost" onClick={() => setIsCommentModalOpen(true)} className="hover:text-accent">
-            💬 {displayCase.comments ? displayCase.comments.length : 0}
+            💬 {displayCase.comments?.length || 0}
           </Button>
+          <span className="ml-2">👁️ {displayCase.visits || 0}</span>
         </div>
         <div className="text-sm text-gray-500 dark:text-gray-400 font-mono">
           Created {formatRelative(displayCase.createdAt, new Date())}
@@ -100,12 +120,12 @@ export function DisplayCaseComponent({ displayCase, onEdit }: DisplayCaseProps) 
             {displayCase.comments.map((c, idx) => (
               <li key={idx} className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 text-sm text-gray-700 dark:text-gray-200">
                 <span className="font-bold text-primary dark:text-secondary">{c.user}:</span> {c.text}
-                {c.createdAt && (
+                {c.timestamp && (
                   <span className="block text-xs text-gray-400 mt-1">
-                    {typeof c.createdAt === 'string'
-                      ? c.createdAt
-                      : c.createdAt?.seconds
-                        ? new Date(c.createdAt.seconds * 1000).toLocaleString()
+                    {typeof c.timestamp === 'string'
+                      ? c.timestamp
+                      : c.timestamp instanceof Date
+                        ? c.timestamp.toLocaleString()
                         : ''}
                   </span>
                 )}

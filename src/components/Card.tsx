@@ -36,8 +36,8 @@ export function Card({ card, onClick, onCardDeleted }: CardProps) {
         <p className="text-sm text-gray-600">#{card.cardNumber}</p>
         <p className="text-sm text-gray-600">Condition: {card.condition}</p>
         <div className="flex justify-between text-sm">
-          <span className="text-gray-600">Paid: ${card.pricePaid}</span>
-          <span className="font-semibold">Value: ${card.currentValue}</span>
+          <span className="text-gray-600">Paid: ${card.pricePaid !== undefined ? card.pricePaid.toFixed(2) : '0.00'}</span>
+          <span className="font-semibold">Value: ${card.currentValue !== undefined ? card.currentValue.toFixed(2) : '0.00'}</span>
         </div>
       </div>
       {user && (

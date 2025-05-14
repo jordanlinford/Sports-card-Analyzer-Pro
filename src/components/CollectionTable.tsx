@@ -4,7 +4,7 @@ import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
 import { EmergencyDeleteButton } from "@/components/EmergencyDeleteButton";
 import { useQueryClient } from "@tanstack/react-query";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const PAGE_SIZE = 10;
@@ -89,7 +89,7 @@ export default function CollectionTable({ onEditCard, cards, onUpdateCard, updat
                   {card.condition}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  ${(card.currentValue || card.price || 0).toFixed(2)}
+                  ${((card.currentValue || card.price || 0).toFixed(2))}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                   {card.tags && card.tags.length > 0 ? card.tags.join(', ') : '—'}
@@ -114,6 +114,21 @@ export default function CollectionTable({ onEditCard, cards, onUpdateCard, updat
                         )}
                       </Button>
                     )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 w-8 p-0"
+                      title="Check on eBay"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        // Create a full search string for eBay
+                        const searchQuery = `${card.year} ${card.playerName} ${card.cardSet} ${card.variation || ''} ${card.cardNumber} ${card.condition || ''}`;
+                        // Open eBay search in a new tab
+                        window.open(`https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(searchQuery)}&_sacat=0&LH_Complete=1&LH_Sold=1`, '_blank');
+                      }}
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                    </Button>
                     <button
                       onClick={() => onEditCard?.(card)}
                       className="text-blue-600 hover:text-blue-900"
