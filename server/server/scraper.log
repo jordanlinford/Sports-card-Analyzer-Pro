@@ -104,3 +104,215 @@ Error: Cannot find module '/Users/jordanreedlinford/Desktop/sports-card-starter/
 Node.js v23.10.0
 Fri May  9 16:59:30 MDT 2025: Failed to start server
 Fri May  9 16:59:30 MDT 2025: Maximum retry attempts reached. Server failed to start.
+Tue May 13 13:27:27 MDT 2025: Starting eBay scraper server
+Tue May 13 13:27:27 MDT 2025: Server started with PID: 48702
+node:internal/modules/cjs/loader:1408
+  throw err;
+  ^
+
+Error: Cannot find module '/Users/jordanreedlinford/Desktop/sports-card-starter/server/server/scraper.js'
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1405:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1061:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1066:22)
+    at Function._load (node:internal/modules/cjs/loader:1215:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:151:5)
+    at node:internal/main/run_main_module:33:47 {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: []
+}
+
+Node.js v23.10.0
+Tue May 13 13:27:30 MDT 2025: Failed to start server
+Tue May 13 13:27:30 MDT 2025: Retrying in 10 seconds... (Attempt 1 of 5)
+Tue May 13 13:27:40 MDT 2025: Server started with PID: 48749
+node:internal/modules/cjs/loader:1408
+  throw err;
+  ^
+
+Error: Cannot find module '/Users/jordanreedlinford/Desktop/sports-card-starter/server/server/scraper.js'
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1405:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1061:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1066:22)
+    at Function._load (node:internal/modules/cjs/loader:1215:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:151:5)
+    at node:internal/main/run_main_module:33:47 {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: []
+}
+
+Node.js v23.10.0
+Tue May 13 13:27:43 MDT 2025: Failed to start server
+Tue May 13 13:27:43 MDT 2025: Retrying in 10 seconds... (Attempt 2 of 5)
+Tue May 13 13:27:53 MDT 2025: Server started with PID: 48797
+node:internal/modules/cjs/loader:1408
+  throw err;
+  ^
+
+Error: Cannot find module '/Users/jordanreedlinford/Desktop/sports-card-starter/server/server/scraper.js'
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1405:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1061:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1066:22)
+    at Function._load (node:internal/modules/cjs/loader:1215:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:151:5)
+    at node:internal/main/run_main_module:33:47 {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: []
+}
+
+Node.js v23.10.0
+Tue May 13 13:27:56 MDT 2025: Failed to start server
+Tue May 13 13:27:56 MDT 2025: Retrying in 10 seconds... (Attempt 3 of 5)
+Tue May 13 13:28:06 MDT 2025: Server started with PID: 48840
+node:internal/modules/cjs/loader:1408
+  throw err;
+  ^
+
+Error: Cannot find module '/Users/jordanreedlinford/Desktop/sports-card-starter/server/server/scraper.js'
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1405:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1061:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1066:22)
+    at Function._load (node:internal/modules/cjs/loader:1215:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:151:5)
+    at node:internal/main/run_main_module:33:47 {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: []
+}
+
+Node.js v23.10.0
+Tue May 13 13:28:09 MDT 2025: Failed to start server
+Tue May 13 13:28:09 MDT 2025: Retrying in 10 seconds... (Attempt 4 of 5)
+Tue May 13 13:28:19 MDT 2025: Server started with PID: 48883
+node:internal/modules/cjs/loader:1408
+  throw err;
+  ^
+
+Error: Cannot find module '/Users/jordanreedlinford/Desktop/sports-card-starter/server/server/scraper.js'
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1405:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1061:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1066:22)
+    at Function._load (node:internal/modules/cjs/loader:1215:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:151:5)
+    at node:internal/main/run_main_module:33:47 {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: []
+}
+
+Node.js v23.10.0
+Tue May 13 13:28:22 MDT 2025: Failed to start server
+Tue May 13 13:28:22 MDT 2025: Maximum retry attempts reached. Server failed to start.
+Tue May 13 16:31:54 MDT 2025: Starting eBay scraper server
+Tue May 13 16:31:54 MDT 2025: Server started with PID: 59429
+node:internal/modules/cjs/loader:1408
+  throw err;
+  ^
+
+Error: Cannot find module '/Users/jordanreedlinford/Desktop/sports-card-starter/server/server/scraper.js'
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1405:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1061:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1066:22)
+    at Function._load (node:internal/modules/cjs/loader:1215:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:151:5)
+    at node:internal/main/run_main_module:33:47 {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: []
+}
+
+Node.js v23.10.0
+Tue May 13 16:31:57 MDT 2025: Failed to start server
+Tue May 13 16:31:57 MDT 2025: Retrying in 10 seconds... (Attempt 1 of 5)
+Tue May 13 16:32:07 MDT 2025: Server started with PID: 59475
+node:internal/modules/cjs/loader:1408
+  throw err;
+  ^
+
+Error: Cannot find module '/Users/jordanreedlinford/Desktop/sports-card-starter/server/server/scraper.js'
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1405:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1061:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1066:22)
+    at Function._load (node:internal/modules/cjs/loader:1215:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:151:5)
+    at node:internal/main/run_main_module:33:47 {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: []
+}
+
+Node.js v23.10.0
+Tue May 13 16:32:10 MDT 2025: Failed to start server
+Tue May 13 16:32:10 MDT 2025: Retrying in 10 seconds... (Attempt 2 of 5)
+Tue May 13 16:32:20 MDT 2025: Server started with PID: 59523
+node:internal/modules/cjs/loader:1408
+  throw err;
+  ^
+
+Error: Cannot find module '/Users/jordanreedlinford/Desktop/sports-card-starter/server/server/scraper.js'
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1405:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1061:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1066:22)
+    at Function._load (node:internal/modules/cjs/loader:1215:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:151:5)
+    at node:internal/main/run_main_module:33:47 {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: []
+}
+
+Node.js v23.10.0
+Tue May 13 16:32:23 MDT 2025: Failed to start server
+Tue May 13 16:32:23 MDT 2025: Retrying in 10 seconds... (Attempt 3 of 5)
+Tue May 13 16:32:33 MDT 2025: Server started with PID: 59585
+node:internal/modules/cjs/loader:1408
+  throw err;
+  ^
+
+Error: Cannot find module '/Users/jordanreedlinford/Desktop/sports-card-starter/server/server/scraper.js'
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1405:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1061:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1066:22)
+    at Function._load (node:internal/modules/cjs/loader:1215:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:151:5)
+    at node:internal/main/run_main_module:33:47 {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: []
+}
+
+Node.js v23.10.0
+Tue May 13 16:32:37 MDT 2025: Failed to start server
+Tue May 13 16:32:37 MDT 2025: Retrying in 10 seconds... (Attempt 4 of 5)
+Tue May 13 16:32:47 MDT 2025: Server started with PID: 59658
+node:internal/modules/cjs/loader:1408
+  throw err;
+  ^
+
+Error: Cannot find module '/Users/jordanreedlinford/Desktop/sports-card-starter/server/server/scraper.js'
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1405:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1061:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1066:22)
+    at Function._load (node:internal/modules/cjs/loader:1215:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:151:5)
+    at node:internal/main/run_main_module:33:47 {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: []
+}
+
+Node.js v23.10.0
+Tue May 13 16:32:50 MDT 2025: Failed to start server
+Tue May 13 16:32:50 MDT 2025: Maximum retry attempts reached. Server failed to start.

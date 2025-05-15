@@ -68,7 +68,7 @@ const App: React.FC = () => {
             element={<DisplayCases />} 
           />
           <Route 
-            path="/display-case/:id" 
+            path="/display-cases/:id" 
             element={<DisplayCasePage />} 
           />
           <Route 

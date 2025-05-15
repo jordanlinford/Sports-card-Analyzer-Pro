@@ -6,6 +6,9 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Check } from "lucide-react";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase/config";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
 
 // Add your Stripe price IDs here
 const PRICE_IDS: Record<string, Record<string, string>> = {
@@ -26,13 +29,15 @@ const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3001";
 
 export default function ProfilePage() {
   const { user, tier, currentTier, loading, error, isAdmin } = useUserSubscription();
-  const { updateProfile, updateEmail } = useAuth();
+  const { updateProfile, updateEmail, resetPassword } = useAuth();
   const [username, setUsername] = useState(user?.displayName || "");
   const [email, setEmail] = useState(user?.email || "");
   const [emailOptIn, setEmailOptIn] = useState(false);
   const [saving, setSaving] = useState(false);
   const [profileMsg, setProfileMsg] = useState("");
   const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [showPasswordReset, setShowPasswordReset] = useState(false);
+  const [passwordResetEmail, setPasswordResetEmail] = useState(user?.email || "");
 
   useEffect(() => {
     if (!user) return;
@@ -94,6 +99,21 @@ export default function ProfilePage() {
     }
   };
 
+  const handlePasswordReset = async () => {
+    if (!passwordResetEmail) {
+      toast.error("Please enter your email address");
+      return;
+    }
+
+    try {
+      await resetPassword(passwordResetEmail);
+      setShowPasswordReset(false);
+      toast.success("Password reset email sent. Please check your inbox.");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to send password reset email");
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -131,25 +151,24 @@ export default function ProfilePage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-1">Username</label>
-            <input
-              className="w-full border rounded px-3 py-2"
+            <Label htmlFor="username">Username</Label>
+            <Input
+              id="username"
               value={username}
               onChange={e => setUsername(e.target.value)}
               disabled={saving}
               placeholder="Enter your username"
-              title="Username"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Email</label>
-            <input
-              className="w-full border rounded px-3 py-2"
+            <Label htmlFor="email">Email</Label>
+            <Input
+              id="email"
+              type="email"
               value={email}
               onChange={e => setEmail(e.target.value)}
               disabled={saving}
               placeholder="Enter your email"
-              title="Email"
             />
           </div>
           <div className="flex items-center gap-2">
@@ -163,12 +182,70 @@ export default function ProfilePage() {
             <label htmlFor="emailOptIn" className="text-sm">Opt in to marketing emails</label>
           </div>
         </CardContent>
-        <CardFooter>
+        <CardFooter className="flex flex-col gap-4">
           <Button onClick={handleProfileSave} disabled={saving} className="w-full">
             {saving ? "Saving..." : "Save Changes"}
           </Button>
-          {profileMsg && <div className="text-sm mt-2 text-center text-green-600">{profileMsg}</div>}
+          {profileMsg && <div className="text-sm text-center text-green-600">{profileMsg}</div>}
         </CardFooter>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Password Management</CardTitle>
+          <CardDescription>
+            {user?.providerData[0]?.providerId === 'password' 
+              ? "Change your password or reset it if you've forgotten it."
+              : "You're signed in with Google. To use password authentication, please sign out and create a new account with email and password."}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {user?.providerData[0]?.providerId === 'password' ? (
+            <div className="space-y-4">
+              {!showPasswordReset ? (
+                <Button
+                  variant="outline"
+                  onClick={() => setShowPasswordReset(true)}
+                  className="w-full"
+                >
+                  Reset Password
+                </Button>
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="reset-email">Email address for password reset</Label>
+                    <Input
+                      id="reset-email"
+                      type="email"
+                      value={passwordResetEmail}
+                      onChange={(e) => setPasswordResetEmail(e.target.value)}
+                      placeholder="Enter your email"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handlePasswordReset}
+                      className="flex-1"
+                    >
+                      Send Reset Link
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowPasswordReset(false)}
+                      className="flex-1"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="text-sm text-gray-500">
+              Password management is not available for Google-authenticated accounts.
+            </div>
+          )}
+        </CardContent>
       </Card>
 
       <div className="space-y-2">

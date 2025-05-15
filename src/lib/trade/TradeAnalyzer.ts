@@ -190,4 +190,15 @@ export function deleteSavedTrade(tradeId: string): boolean {
  */
 function generateTradeId(): string {
   return `trade-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+}
+
+function isGraded(condition) {
+  if (!condition) return false;
+  const normalized = condition.toUpperCase();
+  return (
+    normalized.includes("PSA") ||
+    normalized.includes("BGS") ||
+    normalized.includes("SGC") ||
+    normalized.includes("CGC")
+  );
 } 
